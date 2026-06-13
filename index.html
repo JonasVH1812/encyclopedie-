@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encyclopedie</title>
+
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="script.js"></script>
+</head>
+
+<body>
+
+    <div class="stars"></div>
+
+    <header>
+        <h1 class="titel" id="pageTitle">Encyclopedie</h1>
+
+        <nav>
+            <ul class="navbar" id="navbar">
+                <!-- Pages get rendered here -->
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+
+        <!-- AUTH SCREEN -->
+        <section class="auth-box" id="authBox">
+            <h2 id="authHeading">Sign In</h2>
+
+            <label for="authName" id="authNameLabel" class="hidden">Name</label>
+            <input type="text" id="authName" class="hidden" placeholder="Your name">
+
+            <label for="authEmail">Email</label>
+            <input type="email" id="authEmail" placeholder="you@example.com">
+
+            <label for="authPassword">Password</label>
+            <input type="password" id="authPassword" placeholder="••••••••">
+
+            <div class="auth-error hidden" id="authError"></div>
+
+            <div class="editor-actions">
+                <button class="btn btn-primary" id="authSubmitBtn">Sign In</button>
+            </div>
+
+            <p class="auth-switch">
+                <span id="authSwitchText">Don't have an account?</span>
+                <a href="#" id="authSwitchLink">Sign up</a>
+            </p>
+        </section>
+
+        <!-- APP CONTENT (hidden until logged in) -->
+        <div id="appContent" class="hidden">
+
+            <section class="hero" id="hero">
+                <h2 id="welcomeHeading">Welcome</h2>
+                <p>
+                    This is your personal space for ideas, projects, plans
+                    and your diary. Click "+ New Page" to get started, or
+                    click any page in the menu to read or edit it.
+                </p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary" id="newPageBtn">+ New Page</button>
+                    <button class="btn" id="logoutBtn">Sign out</button>
+                </div>
+            </section>
+
+            <section class="content" id="content">
+                <!-- Page list / cards get rendered here -->
+            </section>
+
+            <!-- Page view / editor -->
+            <section class="page-view hidden" id="pageView">
+                <div class="page-view-header">
+                    <h2 id="pageTitleDisplay"></h2>
+                    <div class="page-actions">
+                        <button class="btn" id="editBtn">Edit</button>
+                        <button class="btn btn-danger" id="deleteBtn">Delete</button>
+                        <button class="btn" id="closeBtn">Close</button>
+                    </div>
+                </div>
+                <div class="page-meta" id="pageMeta"></div>
+                <div class="page-content" id="pageContentDisplay"></div>
+            </section>
+
+            <!-- Editor -->
+            <section class="editor hidden" id="editor">
+                <h2 id="editorHeading">New Page</h2>
+
+                <label for="pageTitleInput">Title</label>
+                <input type="text" id="pageTitleInput" placeholder="e.g. My idea for an app">
+
+                <label for="pageCategoryInput">Category</label>
+                <select id="pageCategoryInput">
+                    <option value="Ideas">Ideas</option>
+                    <option value="Projects">Projects</option>
+                    <option value="Plans">Plans</option>
+                    <option value="Diary">Diary</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <label for="pageContentInput">Content</label>
+                <textarea id="pageContentInput" rows="12" placeholder="Write your thoughts here..."></textarea>
+
+                <div class="editor-actions">
+                    <button class="btn btn-primary" id="saveBtn">Save</button>
+                    <button class="btn" id="cancelBtn">Cancel</button>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <footer>
+        <p>© 2026 The Zero Company</p>
+    </footer>
+
+</body>
+</html>
