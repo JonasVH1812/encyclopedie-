@@ -12,10 +12,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ===== STATE ===== */
 let pages = [];
+let sharedPages = [];
 let currentPageId = null;
 let activeCategory = "All";
 let currentUser = null;
 let authMode = "signin"; // "signin" | "signup"
+let viewMode = "my"; // "my" | "community"
 
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
 
@@ -48,6 +50,9 @@ const editorHeading = document.getElementById("editorHeading");
 const pageTitleInput = document.getElementById("pageTitleInput");
 const pageCategoryInput = document.getElementById("pageCategoryInput");
 const pageContentInput = document.getElementById("pageContentInput");
+const pageSharedInput = document.getElementById("pageSharedInput");
+
+const communityContent = document.getElementById("communityContent");
 
 const newPageBtn = document.getElementById("newPageBtn");
 const editBtn = document.getElementById("editBtn");
@@ -68,7 +73,7 @@ function formatDate(ts) {
 }
 
 function showOnly(section) {
-    [hero, content, pageView, editor].forEach(el => el.classList.add("hidden"));
+    [hero, content, communityContent, pageView, editor].forEach(el => el.classList.add("hidden"));
     section.classList.remove("hidden");
 }
 
@@ -141,7 +146,14 @@ authSubmitBtn.addEventListener("click", async () => {
             if (error) throw error;
         }
     } catch (err) {
-        authError.textContent = err.message || "Something went wrong.";
+        const msg = err.message || "Something went wrong.";
+
+        if (msg.toLowerCase().includes("email not confirmed")) {
+            authError.textContent = "Your email isn't verified yet. Please check your inbox (and spam folder) for the confirmation link before signing in.";
+        } else {
+            authError.textContent = msg;
+        }
+
         authError.classList.remove("hidden");
     } finally {
         authSubmitBtn.disabled = false;
@@ -202,6 +214,7 @@ async function fetchPages() {
         title: row.title,
         category: row.category,
         content: row.content,
+        shared: row.shared,
         created: new Date(row.created_at).getTime(),
         updated: new Date(row.updated_at).getTime()
     }));
@@ -217,12 +230,13 @@ function renderNavbar() {
         a.href = "#";
         a.textContent = cat;
 
-        if (cat === activeCategory) {
+        if (viewMode === "my" && cat === activeCategory) {
             a.classList.add("active");
         }
 
         a.addEventListener("click", (e) => {
             e.preventDefault();
+            viewMode = "my";
             activeCategory = cat;
             currentPageId = null;
             renderNavbar();
@@ -232,6 +246,27 @@ function renderNavbar() {
         li.appendChild(a);
         navbar.appendChild(li);
     });
+
+    // Community link
+    const communityLi = document.createElement("li");
+    const communityLink = document.createElement("a");
+    communityLink.href = "#";
+    communityLink.textContent = "Community";
+
+    if (viewMode === "community") {
+        communityLink.classList.add("active");
+    }
+
+    communityLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        viewMode = "community";
+        currentPageId = null;
+        renderNavbar();
+        await renderCommunity();
+    });
+
+    communityLi.appendChild(communityLink);
+    navbar.appendChild(communityLi);
 }
 
 /* ===== RENDER HOME / CARD LIST ===== */
@@ -273,29 +308,136 @@ function renderHome() {
 
         const date = document.createElement("div");
         date.className = "card-date";
-        date.textContent = "Updated " + formatDate(p.updated);
+        date.textContent = "Updated " + formatDate(p.updated)
+            + (p.shared ? " · Shared with Community" : "");
 
         article.appendChild(cat);
         article.appendChild(h3);
         article.appendChild(snippet);
         article.appendChild(date);
 
-        article.addEventListener("click", () => openPage(p.id));
+        article.addEventListener("click", () => openPage(p.id, "my"));
 
         content.appendChild(article);
     });
 }
 
+/* ===== RENDER COMMUNITY ===== */
+async function renderCommunity() {
+    showOnly(communityContent);
+    hero.classList.add("hidden");
+
+    communityContent.innerHTML = "";
+
+    const loading = document.createElement("div");
+    loading.className = "empty-state";
+    loading.textContent = "Loading shared pages...";
+    communityContent.appendChild(loading);
+
+    const { data, error } = await sb
+        .from("pages")
+        .select("*")
+        .eq("shared", true)
+        .order("updated_at", { ascending: false });
+
+    communityContent.innerHTML = "";
+
+    if (error) {
+        const errDiv = document.createElement("div");
+        errDiv.className = "empty-state";
+        errDiv.textContent = "Could not load community pages.";
+        communityContent.appendChild(errDiv);
+        return;
+    }
+
+    sharedPages = (data || []).map(row => ({
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        content: row.content,
+        author: row.author_name || "Anonymous",
+        created: new Date(row.created_at).getTime(),
+        updated: new Date(row.updated_at).getTime()
+    }));
+
+    if (sharedPages.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No shared pages yet. Be the first to share an idea!";
+        communityContent.appendChild(empty);
+        return;
+    }
+
+    sharedPages.forEach(p => {
+        const article = document.createElement("article");
+
+        const cat = document.createElement("span");
+        cat.className = "card-category";
+        cat.textContent = p.category;
+
+        const h3 = document.createElement("h3");
+        h3.textContent = p.title;
+
+        const author = document.createElement("div");
+        author.className = "card-author";
+        author.textContent = "by " + p.author;
+
+        const snippet = document.createElement("p");
+        snippet.className = "card-snippet";
+        snippet.textContent = p.content;
+
+        const date = document.createElement("div");
+        date.className = "card-date";
+        date.textContent = "Updated " + formatDate(p.updated);
+
+        article.appendChild(cat);
+        article.appendChild(h3);
+        article.appendChild(author);
+        article.appendChild(snippet);
+        article.appendChild(date);
+
+        article.addEventListener("click", () => openPage(p.id, "community"));
+
+        communityContent.appendChild(article);
+    });
+}
+
 /* ===== OPEN PAGE (VIEW) ===== */
-function openPage(id) {
-    const p = pages.find(pg => pg.id === id);
+function openPage(id, source) {
+    source = source || "my";
+
+    let p, isOwner;
+
+    if (source === "community") {
+        p = sharedPages.find(pg => pg.id === id);
+        isOwner = false;
+    } else {
+        p = pages.find(pg => pg.id === id);
+        isOwner = true;
+    }
+
     if (!p) return;
 
     currentPageId = id;
+    pageView.dataset.source = source;
 
     pageTitleDisplay.textContent = p.title;
-    pageMeta.textContent = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
+
+    let meta = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
+    if (source === "community") {
+        meta = `By ${p.author} · ${meta}`;
+    }
+    pageMeta.textContent = meta;
+
     pageContentDisplay.textContent = p.content;
+
+    if (isOwner) {
+        editBtn.classList.remove("hidden");
+        deleteBtn.classList.remove("hidden");
+    } else {
+        editBtn.classList.add("hidden");
+        deleteBtn.classList.add("hidden");
+    }
 
     showOnly(pageView);
 }
@@ -311,12 +453,14 @@ function openEditor(id) {
         pageTitleInput.value = p.title;
         pageCategoryInput.value = p.category;
         pageContentInput.value = p.content;
+        pageSharedInput.checked = !!p.shared;
     } else {
         currentPageId = null;
         editorHeading.textContent = "New Page";
         pageTitleInput.value = "";
         pageCategoryInput.value = activeCategory !== "All" ? activeCategory : "Ideas";
         pageContentInput.value = "";
+        pageSharedInput.checked = false;
     }
 
     showOnly(editor);
@@ -328,6 +472,7 @@ async function savePage() {
     const title = pageTitleInput.value.trim();
     const category = pageCategoryInput.value;
     const text = pageContentInput.value;
+    const shared = pageSharedInput.checked;
 
     if (!title) {
         pageTitleInput.focus();
@@ -345,6 +490,8 @@ async function savePage() {
                     title,
                     category,
                     content: text,
+                    shared,
+                    author_name: shared ? getDisplayName(currentUser) : null,
                     updated_at: new Date().toISOString()
                 })
                 .eq("id", currentPageId);
@@ -357,7 +504,9 @@ async function savePage() {
                     user_id: currentUser.id,
                     title,
                     category,
-                    content: text
+                    content: text,
+                    shared,
+                    author_name: shared ? getDisplayName(currentUser) : null
                 })
                 .select()
                 .single();
@@ -367,7 +516,7 @@ async function savePage() {
         }
 
         await fetchPages();
-        openPage(currentPageId);
+        openPage(currentPageId, "my");
     } catch (err) {
         alert("Could not save: " + (err.message || "unknown error"));
     } finally {
@@ -437,14 +586,22 @@ async function deletePage() {
 newPageBtn.addEventListener("click", () => openEditor(null));
 editBtn.addEventListener("click", () => openEditor(currentPageId));
 deleteBtn.addEventListener("click", deletePage);
-closeBtn.addEventListener("click", () => {
+closeBtn.addEventListener("click", async () => {
+    const source = pageView.dataset.source;
     currentPageId = null;
-    renderHome();
+
+    if (source === "community") {
+        await renderCommunity();
+    } else {
+        renderHome();
+    }
 });
 saveBtn.addEventListener("click", savePage);
 cancelBtn.addEventListener("click", () => {
     if (currentPageId) {
-        openPage(currentPageId);
+        openPage(currentPageId, "my");
+    } else if (viewMode === "community") {
+        renderCommunity();
     } else {
         renderHome();
     }
