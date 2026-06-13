@@ -104,10 +104,20 @@
                 <label for="pageContentInput">Content</label>
                 <textarea id="pageContentInput" rows="12" placeholder="Write your thoughts here..."></textarea>
 
+                <label class="checkbox-label">
+                    <input type="checkbox" id="pageSharedInput">
+                    Share this page with the Community
+                </label>
+
                 <div class="editor-actions">
                     <button class="btn btn-primary" id="saveBtn">Save</button>
                     <button class="btn" id="cancelBtn">Cancel</button>
                 </div>
+            </section>
+
+            <!-- Community view -->
+            <section class="content hidden" id="communityContent">
+                <!-- Shared pages get rendered here -->
             </section>
 
         </div>
