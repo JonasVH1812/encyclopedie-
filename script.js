@@ -8,7 +8,7 @@ document.addEventListener("mousemove", (e) => {
 const SUPABASE_URL = "https://yxtcyfxupfhlgfknhfke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_QNNFueMNFT6fnpEhXNdzDg__s-xQm5M";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ===== STATE ===== */
 let pages = [];
@@ -123,7 +123,7 @@ authSubmitBtn.addEventListener("click", async () => {
 
     try {
         if (authMode === "signup") {
-            const { data, error } = await supabase.auth.signUp({
+            const { data, error } = await sb.auth.signUp({
                 email,
                 password,
                 options: { data: { name: name || email.split("@")[0] } }
@@ -137,7 +137,7 @@ authSubmitBtn.addEventListener("click", async () => {
                 setAuthMode("signin");
             }
         } else {
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            const { error } = await sb.auth.signInWithPassword({ email, password });
             if (error) throw error;
         }
     } catch (err) {
@@ -150,11 +150,11 @@ authSubmitBtn.addEventListener("click", async () => {
 });
 
 logoutBtn.addEventListener("click", async () => {
-    await supabase.auth.signOut();
+    await sb.auth.signOut();
 });
 
 /* ===== AUTH STATE LISTENER ===== */
-supabase.auth.onAuthStateChange((event, session) => {
+sb.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
 
     if (currentUser) {
@@ -186,7 +186,7 @@ async function showApp() {
 
 /* ===== DATA: FETCH ===== */
 async function fetchPages() {
-    const { data, error } = await supabase
+    const { data, error } = await sb
         .from("pages")
         .select("*")
         .order("updated_at", { ascending: false });
@@ -339,7 +339,7 @@ async function savePage() {
 
     try {
         if (currentPageId) {
-            const { error } = await supabase
+            const { error } = await sb
                 .from("pages")
                 .update({
                     title,
@@ -351,7 +351,7 @@ async function savePage() {
 
             if (error) throw error;
         } else {
-            const { data, error } = await supabase
+            const { data, error } = await sb
                 .from("pages")
                 .insert({
                     user_id: currentUser.id,
@@ -404,7 +404,7 @@ async function deletePage() {
         yesBtn.disabled = true;
         yesBtn.textContent = "Deleting...";
 
-        const { error } = await supabase
+        const { error } = await sb
             .from("pages")
             .delete()
             .eq("id", currentPageId);
