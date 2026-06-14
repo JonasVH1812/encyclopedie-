@@ -294,7 +294,6 @@ async function fetchProfile() {
     }
 
     if (!data) {
-        // Profile may not exist yet if trigger hasn't run - create one
         const isOwner = currentUser.email === OWNER_EMAIL;
         const insertRes = await sb
             .from("profiles")
@@ -363,7 +362,6 @@ function renderNavbar() {
         navbar.appendChild(li);
     });
 
-    // Community link
     const communityLi = document.createElement("li");
     const communityLink = document.createElement("a");
     communityLink.href = "#";
@@ -443,14 +441,11 @@ async function enterCommunity() {
     showOnly(communityTab);
     hero.classList.add("hidden");
 
-    // Show/hide admin subnav based on role
     if (isAdminOrOwner(currentProfile)) {
         adminSubnavBtn.classList.remove("hidden");
     } else {
         adminSubnavBtn.classList.add("hidden");
-        if (communitySubview === "admin") {
-            communitySubview = "feed";
-        }
+        if (communitySubview === "admin") communitySubview = "feed";
     }
 
     setCommunitySubview(communitySubview);
@@ -559,17 +554,14 @@ async function renderFeed() {
         card.appendChild(contentP);
         card.appendChild(date);
 
-        // Delete button: owner of post, or admin/owner role
         const canDelete = post.user_id === currentUser.id || isAdminOrOwner(currentProfile);
         if (canDelete) {
             const actions = document.createElement("div");
             actions.className = "post-card-actions";
-
             const delBtn = document.createElement("button");
             delBtn.className = "btn btn-danger btn-sm";
             delBtn.textContent = "Delete";
             delBtn.addEventListener("click", () => deletePost(post.id));
-
             actions.appendChild(delBtn);
             card.appendChild(actions);
         }
@@ -579,17 +571,9 @@ async function renderFeed() {
 }
 
 async function deletePost(postId) {
-    const { error } = await sb
-        .from("community_posts")
-        .delete()
-        .eq("id", postId);
-
-    if (error) {
-        alert("Could not delete post: " + error.message);
-        return;
-    }
-
-    await renderFeed();
+    const { error } = await sb.from("community_posts").delete().eq("id", postId);
+    if (error) alert("Could not delete post: " + error.message);
+    else await renderFeed();
 }
 
 /* ---------- POST EDITOR ---------- */
@@ -601,33 +585,25 @@ newPostBtn.addEventListener("click", () => {
     postTitleInput.focus();
 });
 
-cancelPostBtn.addEventListener("click", () => {
-    showCommunitySection(communityFeed);
-});
+cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed));
 
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
     const category = postCategoryInput.value;
     const text = postContentInput.value.trim();
 
-    if (!title) {
-        postTitleInput.focus();
-        return;
-    }
+    if (!title) return postTitleInput.focus();
 
     savePostBtn.disabled = true;
     savePostBtn.textContent = "Posting...";
 
     try {
-        const { error } = await sb
-            .from("community_posts")
-            .insert({
-                user_id: currentUser.id,
-                title,
-                category,
-                content: text
-            });
-
+        const { error } = await sb.from("community_posts").insert({
+            user_id: currentUser.id,
+            title,
+            category,
+            content: text
+        });
         if (error) throw error;
 
         showCommunitySection(communityFeed);
@@ -642,38 +618,21 @@ savePostBtn.addEventListener("click", async () => {
 
 /* ---------- MEMBERS ---------- */
 async function fetchMembers() {
-    const { data, error } = await sb
-        .from("profiles")
-        .select("*")
-        .order("joined_at", { ascending: true });
-
-    if (error) {
-        console.error(error);
-        return [];
-    }
-
+    const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
+    if (error) console.error(error);
     return data || [];
 }
 
 async function fetchStats() {
-    const { data, error } = await sb
-        .from("profile_stats")
-        .select("*");
-
-    if (error) {
-        console.error(error);
-        return;
-    }
+    const { data, error } = await sb.from("profile_stats").select("*");
+    if (error) return console.error(error);
 
     profileStatsMap = {};
-    (data || []).forEach(row => {
-        profileStatsMap[row.id] = row;
-    });
+    (data || []).forEach(row => profileStatsMap[row.id] = row);
 }
 
 async function renderMembers() {
     membersList.innerHTML = "";
-
     const loading = document.createElement("div");
     loading.className = "empty-state";
     loading.textContent = "Loading members...";
@@ -681,7 +640,6 @@ async function renderMembers() {
 
     members = await fetchMembers();
     await fetchStats();
-
     membersList.innerHTML = "";
 
     if (members.length === 0) {
@@ -692,7 +650,6 @@ async function renderMembers() {
         return;
     }
 
-    // Sort: Owner first, then Admins, then everyone else by join date
     const roleOrder = { Owner: 0, Admin: 1 };
     const sorted = [...members].sort((a, b) => {
         const ra = roleOrder[a.role] ?? 2;
@@ -713,7 +670,6 @@ async function renderMembers() {
         avatar.textContent = getInitial(member.display_name || member.username);
 
         const nameWrap = document.createElement("div");
-
         const name = document.createElement("div");
         name.className = "member-card-name";
         name.textContent = member.display_name || member.username || "Unknown";
@@ -743,7 +699,6 @@ async function renderMembers() {
         }
 
         card.addEventListener("click", () => openProfile(member.id));
-
         membersList.appendChild(card);
     });
 }
@@ -752,21 +707,10 @@ async function renderMembers() {
 async function openProfile(userId) {
     viewingProfileId = userId;
 
-    let profile = members.find(m => m.id === userId);
+    let profile = members.find(m => m.id === userId) || 
+        (await sb.from("profiles").select("*").eq("id", userId).maybeSingle()).data;
 
-    if (!profile) {
-        const { data } = await sb
-            .from("profiles")
-            .select("*")
-            .eq("id", userId)
-            .maybeSingle();
-        profile = data;
-    }
-
-    if (!profile) {
-        alert("Profile not found.");
-        return;
-    }
+    if (!profile) return alert("Profile not found.");
 
     profileAvatar.textContent = getInitial(profile.display_name || profile.username);
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
@@ -774,35 +718,19 @@ async function openProfile(userId) {
     renderBadges(profileBadges, profile);
     profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile to add one!" : "No bio yet.");
 
-    if (!profileStatsMap[userId]) {
-        await fetchStats();
-    }
+    if (!profileStatsMap[userId]) await fetchStats();
     const stats = profileStatsMap[userId] || { post_count: 0 };
 
-    profileStats.innerHTML = "";
-    const postStat = document.createElement("div");
-    postStat.className = "profile-stat";
-    postStat.innerHTML = `<span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span>`;
-    profileStats.appendChild(postStat);
+    profileStats.innerHTML = `<div class="profile-stat"><span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span></div>`;
 
     const joinDate = new Date(profile.joined_at);
     profileMeta.textContent = "Joined " + joinDate.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 
-    // Show "Edit Profile" button only on own profile
-    if (userId === currentUser.id) {
-        editProfileBtn.classList.remove("hidden");
-        editProfileBtn.dataset.profileId = profile.id;
-    } else {
-        editProfileBtn.classList.add("hidden");
-    }
-
+    editProfileBtn.classList.toggle("hidden", userId !== currentUser.id);
     showCommunitySection(profileView);
 }
 
-profileBackBtn.addEventListener("click", () => {
-    setCommunitySubview(communitySubview === "admin" ? "admin" : "members");
-});
-
+profileBackBtn.addEventListener("click", () => setCommunitySubview(communitySubview === "admin" ? "admin" : "members"));
 profileEditBackBtn.addEventListener("click", () => openProfile(currentUser.id));
 
 editProfileBtn.addEventListener("click", () => {
@@ -810,7 +738,6 @@ editProfileBtn.addEventListener("click", () => {
     editUsername.value = currentProfile.username || "";
     editBio.value = currentProfile.bio || "";
     profileEditError.classList.add("hidden");
-
     showCommunitySection(profileEditView);
 });
 
@@ -828,15 +755,12 @@ saveProfileBtn.addEventListener("click", async () => {
     saveProfileBtn.disabled = true;
     saveProfileBtn.textContent = "Saving...";
 
-    const { error } = await sb
-        .from("profiles")
-        .update({
-            display_name: displayName,
-            username,
-            bio,
-            updated_at: new Date().toISOString()
-        })
-        .eq("id", currentUser.id);
+    const { error } = await sb.from("profiles").update({
+        display_name: displayName,
+        username,
+        bio,
+        updated_at: new Date().toISOString()
+    }).eq("id", currentUser.id);
 
     saveProfileBtn.disabled = false;
     saveProfileBtn.textContent = "Save";
@@ -850,11 +774,10 @@ saveProfileBtn.addEventListener("click", async () => {
     currentProfile.display_name = displayName;
     currentProfile.username = username;
     currentProfile.bio = bio;
-
     await openProfile(currentUser.id);
 });
 
-/* ---------- ADMIN PANEL ---------- */
+/* ---------- ADMIN PANEL (FIXED) ---------- */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
 
@@ -900,11 +823,9 @@ async function renderAdminPanel() {
         const controls = document.createElement("div");
         controls.className = "admin-role-controls";
 
-        // Role select - only Owner can set Admin/Owner roles
+        // Role Select
         const roleSelect = document.createElement("select");
         const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
-
-        // Always include the member's current role even if restricted, so it displays correctly
         const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
 
         rolesToShow.forEach(role => {
@@ -915,21 +836,13 @@ async function renderAdminPanel() {
             roleSelect.appendChild(opt);
         });
 
-        // Disable role select if not owner and member is currently Admin/Owner (can't demote)
-        if (!isOwner && (member.role === "Admin" || member.role === "Owner")) {
-            roleSelect.disabled = true;
-        }
-        // Can't change own role
-        if (member.id === currentUser.id) {
+        if ((!isOwner && (member.role === "Admin" || member.role === "Owner")) || member.id === currentUser.id) {
             roleSelect.disabled = true;
         }
 
         roleSelect.addEventListener("change", async () => {
             const newRole = roleSelect.value;
-            const { error } = await sb
-                .from("profiles")
-                .update({ role: newRole })
-                .eq("id", member.id);
+            const { error } = await sb.from("profiles").update({ role: newRole }).eq("id", member.id);
 
             if (error) {
                 alert("Could not update role: " + error.message);
@@ -943,7 +856,7 @@ async function renderAdminPanel() {
 
         controls.appendChild(roleSelect);
 
-        // Tag input for extra badges (Admin/Owner can manage these)
+        // Tag Select
         const tagSelect = document.createElement("select");
         const blankOpt = document.createElement("option");
         blankOpt.value = "";
@@ -963,34 +876,29 @@ async function renderAdminPanel() {
             if (!tagSelect.value) return;
 
             const newTags = [...(member.extra_tags || []), tagSelect.value];
-            const { error } = await sb
-                .from("profiles")
-                .update({ extra_tags: newTags })
-                .eq("id", member.id);
+            const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
 
             if (error) {
                 alert("Could not add tag: " + error.message);
+                tagSelect.value = "";
                 return;
             }
 
             member.extra_tags = newTags;
             renderBadges(badges, member);
-            renderAdminPanel();
+            tagSelect.value = "";
         });
 
         controls.appendChild(tagSelect);
 
-        // Remove tag buttons
+        // Remove Tag Buttons
         (member.extra_tags || []).forEach(tag => {
             const removeBtn = document.createElement("button");
             removeBtn.className = "btn btn-sm";
             removeBtn.textContent = "Remove " + tag;
             removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
-                const { error } = await sb
-                    .from("profiles")
-                    .update({ extra_tags: newTags })
-                    .eq("id", member.id);
+                const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
 
                 if (error) {
                     alert("Could not remove tag: " + error.message);
@@ -999,7 +907,6 @@ async function renderAdminPanel() {
 
                 member.extra_tags = newTags;
                 renderBadges(badges, member);
-                renderAdminPanel();
             });
             controls.appendChild(removeBtn);
         });
@@ -1024,14 +931,12 @@ function openPage(id) {
     if (!p) return;
 
     currentPageId = id;
-
     pageTitleDisplay.textContent = p.title;
     pageMeta.textContent = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
     pageContentDisplay.textContent = p.content;
 
     editBtn.classList.remove("hidden");
     deleteBtn.classList.remove("hidden");
-
     showOnly(pageView);
 }
 
@@ -1040,7 +945,6 @@ function openEditor(id) {
     if (id) {
         const p = pages.find(pg => pg.id === id);
         if (!p) return;
-
         currentPageId = id;
         editorHeading.textContent = "Edit Page";
         pageTitleInput.value = p.title;
@@ -1064,39 +968,21 @@ async function savePage() {
     const category = pageCategoryInput.value;
     const text = pageContentInput.value;
 
-    if (!title) {
-        pageTitleInput.focus();
-        return;
-    }
+    if (!title) return pageTitleInput.focus();
 
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving...";
 
     try {
         if (currentPageId) {
-            const { error } = await sb
-                .from("pages")
-                .update({
-                    title,
-                    category,
-                    content: text,
-                    updated_at: new Date().toISOString()
-                })
-                .eq("id", currentPageId);
-
+            const { error } = await sb.from("pages").update({
+                title, category, content: text, updated_at: new Date().toISOString()
+            }).eq("id", currentPageId);
             if (error) throw error;
         } else {
-            const { data, error } = await sb
-                .from("pages")
-                .insert({
-                    user_id: currentUser.id,
-                    title,
-                    category,
-                    content: text
-                })
-                .select()
-                .single();
-
+            const { data, error } = await sb.from("pages").insert({
+                user_id: currentUser.id, title, category, content: text
+            }).select().single();
             if (error) throw error;
             currentPageId = data.id;
         }
@@ -1114,16 +1000,11 @@ async function savePage() {
 /* ===== DELETE PAGE ===== */
 async function deletePage() {
     if (!currentPageId) return;
-
     const p = pages.find(pg => pg.id === currentPageId);
     if (!p) return;
 
     let confirmBar = document.getElementById("deleteConfirmBar");
-
-    if (confirmBar) {
-        confirmBar.remove();
-        return;
-    }
+    if (confirmBar) return confirmBar.remove();
 
     confirmBar = document.createElement("div");
     confirmBar.id = "deleteConfirmBar";
@@ -1138,19 +1019,13 @@ async function deletePage() {
     yesBtn.addEventListener("click", async () => {
         yesBtn.disabled = true;
         yesBtn.textContent = "Deleting...";
-
-        const { error } = await sb
-            .from("pages")
-            .delete()
-            .eq("id", currentPageId);
-
+        const { error } = await sb.from("pages").delete().eq("id", currentPageId);
         if (error) {
             alert("Could not delete: " + error.message);
             yesBtn.disabled = false;
             yesBtn.textContent = "Yes, delete";
             return;
         }
-
         await fetchPages();
         currentPageId = null;
         renderHome();
@@ -1161,10 +1036,7 @@ async function deletePage() {
     noBtn.textContent = "Cancel";
     noBtn.addEventListener("click", () => confirmBar.remove());
 
-    confirmBar.appendChild(text);
-    confirmBar.appendChild(yesBtn);
-    confirmBar.appendChild(noBtn);
-
+    confirmBar.append(text, yesBtn, noBtn);
     pageView.appendChild(confirmBar);
 }
 
@@ -1172,17 +1044,11 @@ async function deletePage() {
 newPageBtn.addEventListener("click", () => openEditor(null));
 editBtn.addEventListener("click", () => openEditor(currentPageId));
 deleteBtn.addEventListener("click", deletePage);
-closeBtn.addEventListener("click", () => {
-    currentPageId = null;
-    renderHome();
-});
+closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); });
 saveBtn.addEventListener("click", savePage);
 cancelBtn.addEventListener("click", () => {
-    if (currentPageId) {
-        openPage(currentPageId);
-    } else {
-        renderHome();
-    }
+    if (currentPageId) openPage(currentPageId);
+    else renderHome();
 });
 
 /* ===== INIT ===== */
