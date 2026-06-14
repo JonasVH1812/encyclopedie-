@@ -108,11 +108,8 @@ const logoutBtn = document.getElementById("logoutBtn");
 /* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, {
-        year: "numeric", month: "short", day: "numeric"
-    }) + " " + d.toLocaleTimeString(undefined, {
-        hour: "2-digit", minute: "2-digit"
-    });
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) 
+         + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 function showOnly(section) {
@@ -141,7 +138,6 @@ function badgeClass(role) {
 
 function renderBadges(container, profile) {
     container.innerHTML = "";
-
     const role = profile.role || "Member";
     const roleBadge = document.createElement("span");
     roleBadge.className = badgeClass(role);
@@ -215,9 +211,7 @@ authSubmitBtn.addEventListener("click", async () => {
                 password,
                 options: { data: { name: name || email.split("@")[0] } }
             });
-
             if (error) throw error;
-
             if (data.user && !data.session) {
                 authError.textContent = "Account created! Check your email to confirm, then sign in.";
                 authError.classList.remove("hidden");
@@ -228,12 +222,7 @@ authSubmitBtn.addEventListener("click", async () => {
             if (error) throw error;
         }
     } catch (err) {
-        const msg = err.message || "Something went wrong.";
-        if (msg.toLowerCase().includes("email not confirmed")) {
-            authError.textContent = "Your email isn't verified yet. Please check your inbox.";
-        } else {
-            authError.textContent = msg;
-        }
+        authError.textContent = err.message || "Something went wrong.";
         authError.classList.remove("hidden");
     } finally {
         authSubmitBtn.disabled = false;
@@ -248,7 +237,11 @@ logoutBtn.addEventListener("click", async () => {
 /* ===== AUTH STATE LISTENER ===== */
 sb.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
-    if (currentUser) showApp(); else showAuth();
+    if (currentUser) {
+        showApp();
+    } else {
+        showAuth();
+    }
 });
 
 function showAuth() {
@@ -272,26 +265,39 @@ async function showApp() {
     renderHome();
 }
 
-/* ===== DATA ===== */
+/* ===== DATA FETCH ===== */
 async function fetchProfile() {
-    let { data, error } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
+    let { data, error } = await sb
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
     if (error) console.error(error);
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
-        const insertRes = await sb.from("profiles").insert({
-            id: currentUser.id,
-            username: currentUser.email.split("@")[0],
-            display_name: getDisplayName(currentUser),
-            role: isOwner ? "Owner" : "Member"
-        }).select().single();
+        const insertRes = await sb
+            .from("profiles")
+            .insert({
+                id: currentUser.id,
+                username: currentUser.email.split("@")[0],
+                display_name: getDisplayName(currentUser),
+                role: isOwner ? "Owner" : "Member"
+            })
+            .select()
+            .single();
         data = insertRes.data;
     }
     currentProfile = data;
 }
 
 async function fetchPages() {
-    const { data, error } = await sb.from("pages").select("*").order("updated_at", { ascending: false });
+    const { data, error } = await sb
+        .from("pages")
+        .select("*")
+        .order("updated_at", { ascending: false });
+
     if (error) console.error(error);
     pages = (data || []).map(row => ({
         id: row.id,
@@ -303,7 +309,7 @@ async function fetchPages() {
     }));
 }
 
-/* ===== NAVBAR & HOME ===== */
+/* ===== NAVBAR ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
     CATEGORIES.forEach(cat => {
@@ -340,6 +346,7 @@ function renderNavbar() {
     navbar.appendChild(communityLi);
 }
 
+/* ===== HOME ===== */
 function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
@@ -515,7 +522,7 @@ async function renderFeed() {
 
 async function deletePost(postId) {
     const { error } = await sb.from("community_posts").delete().eq("id", postId);
-    if (error) alert("Could not delete post: " + error.message);
+    if (error) alert("Could not delete post");
     else await renderFeed();
 }
 
@@ -532,7 +539,7 @@ cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed
 
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
-    if (!title) return postTitleInput.focus();
+    if (!title) return;
 
     savePostBtn.disabled = true;
     savePostBtn.textContent = "Posting...";
@@ -642,7 +649,7 @@ async function renderMembers() {
     });
 }
 
-/* PROFILE VIEW */
+/* PROFILE */
 async function openProfile(userId) {
     viewingProfileId = userId;
     let profile = members.find(m => m.id === userId);
@@ -656,7 +663,7 @@ async function openProfile(userId) {
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
     profileUsername.textContent = "@" + (profile.username || "unknown");
     renderBadges(profileBadges, profile);
-    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile." : "No bio yet.");
+    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile to add one!" : "No bio yet.");
 
     if (!profileStatsMap[userId]) await fetchStats();
     const stats = profileStatsMap[userId] || { post_count: 0 };
@@ -716,7 +723,7 @@ saveProfileBtn.addEventListener("click", async () => {
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL - FIXED ========== */
+/* ========== ADMIN PANEL (Roles now save permanently) ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -789,6 +796,7 @@ async function renderAdminPanel() {
 
             member.role = newRole;
             renderBadges(badges, member);
+            console.log(`✅ Role updated and saved: ${newRole}`);
         });
 
         controls.appendChild(roleSelect);
@@ -811,16 +819,13 @@ async function renderAdminPanel() {
 
         tagSelect.addEventListener("change", async () => {
             if (!tagSelect.value) return;
-
             const newTags = [...(member.extra_tags || []), tagSelect.value];
             const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
-
             if (error) {
                 alert("Could not add tag: " + error.message);
                 tagSelect.value = "";
                 return;
             }
-
             member.extra_tags = newTags;
             renderBadges(badges, member);
             tagSelect.value = "";
@@ -836,12 +841,10 @@ async function renderAdminPanel() {
             removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
                 const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
-
                 if (error) {
                     alert("Could not remove tag: " + error.message);
                     return;
                 }
-
                 member.extra_tags = newTags;
                 renderBadges(badges, member);
             });
