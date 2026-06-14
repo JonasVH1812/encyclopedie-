@@ -31,84 +31,85 @@ const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
 const TAG_OPTIONS = ["VIP", "Contributor", "Moderator", "Co-Owner"];
 
 /* ===== ELEMENTS ===== */
-const pageTitle = document.getElementById("pageTitle");
-const navbar = document.getElementById("navbar");
-const content = document.getElementById("content");
-const hero = document.getElementById("hero");
+const pageTitle      = document.getElementById("pageTitle");
+const navbar         = document.getElementById("navbar");
+const content        = document.getElementById("content");
+const hero           = document.getElementById("hero");
 const welcomeHeading = document.getElementById("welcomeHeading");
-const appContent = document.getElementById("appContent");
+const appContent     = document.getElementById("appContent");
 
-const authBox = document.getElementById("authBox");
-const authHeading = document.getElementById("authHeading");
-const authName = document.getElementById("authName");
-const authNameLabel = document.getElementById("authNameLabel");
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-const authError = document.getElementById("authError");
-const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authBox        = document.getElementById("authBox");
+const authHeading    = document.getElementById("authHeading");
+const authName       = document.getElementById("authName");
+const authNameLabel  = document.getElementById("authNameLabel");
+const authEmail      = document.getElementById("authEmail");
+const authPassword   = document.getElementById("authPassword");
+const authError      = document.getElementById("authError");
+const authSubmitBtn  = document.getElementById("authSubmitBtn");
 const authSwitchText = document.getElementById("authSwitchText");
 const authSwitchLink = document.getElementById("authSwitchLink");
 
-const pageView = document.getElementById("pageView");
-const pageTitleDisplay = document.getElementById("pageTitleDisplay");
-const pageMeta = document.getElementById("pageMeta");
+const pageView           = document.getElementById("pageView");
+const pageTitleDisplay   = document.getElementById("pageTitleDisplay");
+const pageMeta           = document.getElementById("pageMeta");
 const pageContentDisplay = document.getElementById("pageContentDisplay");
 
-const editor = document.getElementById("editor");
-const editorHeading = document.getElementById("editorHeading");
-const pageTitleInput = document.getElementById("pageTitleInput");
-const pageCategoryInput = document.getElementById("pageCategoryInput");
+const editor           = document.getElementById("editor");
+const editorHeading    = document.getElementById("editorHeading");
+const pageTitleInput   = document.getElementById("pageTitleInput");
+const pageCategoryInput= document.getElementById("pageCategoryInput");
 const pageContentInput = document.getElementById("pageContentInput");
 
-const communityTab = document.getElementById("communityTab");
-const communityFeed = document.getElementById("communityFeed");
-const communityMembers = document.getElementById("communityMembers");
-const communityAdmin = document.getElementById("communityAdmin");
-const profileView = document.getElementById("profileView");
-const postEditor = document.getElementById("postEditor");
+const communityTab    = document.getElementById("communityTab");
+const communityFeed   = document.getElementById("communityFeed");
+const communityMembers= document.getElementById("communityMembers");
+const communityAdmin  = document.getElementById("communityAdmin");
+const profileView     = document.getElementById("profileView");
+const postEditor      = document.getElementById("postEditor");
 
-const postsList = document.getElementById("postsList");
-const membersList = document.getElementById("membersList");
+const postsList        = document.getElementById("postsList");
+const membersList      = document.getElementById("membersList");
 const adminMembersList = document.getElementById("adminMembersList");
-const adminSubnavBtn = document.getElementById("adminSubnavBtn");
+const adminSubnavBtn   = document.getElementById("adminSubnavBtn");
 
-const newPostBtn = document.getElementById("newPostBtn");
-const postTitleInput = document.getElementById("postTitleInput");
+const newPostBtn        = document.getElementById("newPostBtn");
+const postTitleInput    = document.getElementById("postTitleInput");
 const postCategoryInput = document.getElementById("postCategoryInput");
-const postContentInput = document.getElementById("postContentInput");
-const savePostBtn = document.getElementById("savePostBtn");
-const cancelPostBtn = document.getElementById("cancelPostBtn");
+const postContentInput  = document.getElementById("postContentInput");
+const savePostBtn       = document.getElementById("savePostBtn");
+const cancelPostBtn     = document.getElementById("cancelPostBtn");
 
-const profileBackBtn = document.getElementById("profileBackBtn");
-const profileAvatar = document.getElementById("profileAvatar");
+const profileBackBtn     = document.getElementById("profileBackBtn");
+const profileAvatar      = document.getElementById("profileAvatar");
 const profileDisplayName = document.getElementById("profileDisplayName");
-const profileUsername = document.getElementById("profileUsername");
-const profileBadges = document.getElementById("profileBadges");
-const profileBio = document.getElementById("profileBio");
-const profileStats = document.getElementById("profileStats");
-const profileMeta = document.getElementById("profileMeta");
-const editProfileBtn = document.getElementById("editProfileBtn");
+const profileUsername    = document.getElementById("profileUsername");
+const profileBadges      = document.getElementById("profileBadges");
+const profileBio         = document.getElementById("profileBio");
+const profileStats       = document.getElementById("profileStats");
+const profileMeta        = document.getElementById("profileMeta");
+const editProfileBtn     = document.getElementById("editProfileBtn");
 
-const profileEditView = document.getElementById("profileEditView");
+const profileEditView    = document.getElementById("profileEditView");
 const profileEditBackBtn = document.getElementById("profileEditBackBtn");
-const editDisplayName = document.getElementById("editDisplayName");
-const editUsername = document.getElementById("editUsername");
-const editBio = document.getElementById("editBio");
-const profileEditError = document.getElementById("profileEditError");
-const saveProfileBtn = document.getElementById("saveProfileBtn");
+const editDisplayName    = document.getElementById("editDisplayName");
+const editUsername       = document.getElementById("editUsername");
+const editBio            = document.getElementById("editBio");
+const profileEditError   = document.getElementById("profileEditError");
+const saveProfileBtn     = document.getElementById("saveProfileBtn");
 
 const newPageBtn = document.getElementById("newPageBtn");
-const editBtn = document.getElementById("editBtn");
-const deleteBtn = document.getElementById("deleteBtn");
-const closeBtn = document.getElementById("closeBtn");
-const saveBtn = document.getElementById("saveBtn");
-const cancelBtn = document.getElementById("cancelBtn");
-const logoutBtn = document.getElementById("logoutBtn");
+const editBtn    = document.getElementById("editBtn");
+const deleteBtn  = document.getElementById("deleteBtn");
+const closeBtn   = document.getElementById("closeBtn");
+const saveBtn    = document.getElementById("saveBtn");
+const cancelBtn  = document.getElementById("cancelBtn");
+const logoutBtn  = document.getElementById("logoutBtn");
 
 /* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+        + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 function showOnly(section) {
@@ -143,7 +144,8 @@ function renderBadges(container, profile) {
     roleBadge.textContent = role;
     container.appendChild(roleBadge);
 
-    (profile.extra_tags || []).forEach(tag => {
+    const tags = Array.isArray(profile.extra_tags) ? profile.extra_tags : [];
+    tags.forEach(tag => {
         const span = document.createElement("span");
         span.className = badgeClass(tag);
         span.textContent = tag;
@@ -188,9 +190,9 @@ authSwitchLink.addEventListener("click", (e) => {
 });
 
 authSubmitBtn.addEventListener("click", async () => {
-    const email = authEmail.value.trim();
+    const email    = authEmail.value.trim();
     const password = authPassword.value;
-    const name = authName.value.trim();
+    const name     = authName.value.trim();
 
     authError.classList.add("hidden");
 
@@ -260,18 +262,22 @@ async function showApp() {
 /* ===== DATA ===== */
 async function fetchProfile() {
     let { data, error } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
-    if (error) console.error(error);
+    if (error) console.error("fetchProfile error:", error);
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
-        const { data: newData } = await sb.from("profiles").insert({
+        const { data: newData, error: insertErr } = await sb.from("profiles").insert({
             id: currentUser.id,
             username: currentUser.email.split("@")[0],
             display_name: getDisplayName(currentUser),
-            role: isOwner ? "Owner" : "Member"
+            role: isOwner ? "Owner" : "Member",
+            extra_tags: []
         }).select().single();
+        if (insertErr) console.error("fetchProfile insert error:", insertErr);
         data = newData;
     }
+    // Normalise: ensure extra_tags is always an array
+    if (data && !Array.isArray(data.extra_tags)) data.extra_tags = [];
     currentProfile = data;
 }
 
@@ -293,7 +299,7 @@ function renderNavbar() {
     navbar.innerHTML = "";
     CATEGORIES.forEach(cat => {
         const li = document.createElement("li");
-        const a = document.createElement("a");
+        const a  = document.createElement("a");
         a.href = "#";
         a.textContent = cat;
         if (viewMode === "my" && cat === activeCategory) a.classList.add("active");
@@ -309,7 +315,7 @@ function renderNavbar() {
         navbar.appendChild(li);
     });
 
-    const communityLi = document.createElement("li");
+    const communityLi   = document.createElement("li");
     const communityLink = document.createElement("a");
     communityLink.href = "#";
     communityLink.textContent = "Community";
@@ -331,22 +337,24 @@ function renderHome() {
     content.innerHTML = "";
 
     const filtered = activeCategory === "All" ? pages : pages.filter(p => p.category === activeCategory);
-    const sorted = [...filtered].sort((a, b) => b.updated - a.updated);
+    const sorted   = [...filtered].sort((a, b) => b.updated - a.updated);
 
     if (sorted.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = activeCategory === "All" ? "No pages yet. Click '+ New Page'." : `No pages in "${activeCategory}" yet.`;
+        empty.textContent = activeCategory === "All"
+            ? "No pages yet. Click '+ New Page'."
+            : `No pages in "${activeCategory}" yet.`;
         content.appendChild(empty);
         return;
     }
 
     sorted.forEach(p => {
-        const article = document.createElement("article");
-        const cat = document.createElement("span"); cat.className = "card-category"; cat.textContent = p.category;
-        const h3 = document.createElement("h3"); h3.textContent = p.title;
-        const snippet = document.createElement("p"); snippet.className = "card-snippet"; snippet.textContent = p.content;
-        const date = document.createElement("div"); date.className = "card-date"; date.textContent = "Updated " + formatDate(p.updated);
+        const article  = document.createElement("article");
+        const cat      = document.createElement("span"); cat.className = "card-category"; cat.textContent = p.category;
+        const h3       = document.createElement("h3"); h3.textContent = p.title;
+        const snippet  = document.createElement("p"); snippet.className = "card-snippet"; snippet.textContent = p.content;
+        const date     = document.createElement("div"); date.className = "card-date"; date.textContent = "Updated " + formatDate(p.updated);
 
         article.append(cat, h3, snippet, date);
         article.addEventListener("click", () => openPage(p.id));
@@ -369,7 +377,9 @@ async function enterCommunity() {
 
 function setCommunitySubview(view) {
     communitySubview = view;
-    document.querySelectorAll(".subnav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.subview === view));
+    document.querySelectorAll(".subnav-btn").forEach(btn =>
+        btn.classList.toggle("active", btn.dataset.subview === view)
+    );
 
     if (view === "feed") {
         showCommunitySection(communityFeed);
@@ -383,7 +393,9 @@ function setCommunitySubview(view) {
     }
 }
 
-document.querySelectorAll(".subnav-btn").forEach(btn => btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview)));
+document.querySelectorAll(".subnav-btn").forEach(btn =>
+    btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview))
+);
 
 /* FEED */
 async function renderFeed() {
@@ -395,10 +407,7 @@ async function renderFeed() {
 
     const { data, error } = await sb
         .from("community_posts")
-        .select(`
-            *,
-            profiles!fk_community_posts_user_id(display_name, username, role, extra_tags)
-        `)
+        .select(`*, profiles!fk_community_posts_user_id(display_name, username, role, extra_tags)`)
         .order("created_at", { ascending: false });
 
     postsList.innerHTML = "";
@@ -423,7 +432,7 @@ async function renderFeed() {
     }
 
     posts.forEach(post => {
-        const card = document.createElement("div");
+        const card   = document.createElement("div");
         card.className = "post-card";
 
         const header = document.createElement("div");
@@ -522,7 +531,8 @@ savePostBtn.addEventListener("click", async () => {
 async function fetchMembers() {
     const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
     if (error) console.error(error);
-    return data || [];
+    // Normalise extra_tags for every member
+    return (data || []).map(m => ({ ...m, extra_tags: Array.isArray(m.extra_tags) ? m.extra_tags : [] }));
 }
 
 async function fetchStats() {
@@ -560,7 +570,7 @@ async function renderMembers() {
     });
 
     sorted.forEach(member => {
-        const card = document.createElement("div");
+        const card   = document.createElement("div");
         card.className = "member-card";
 
         const header = document.createElement("div");
@@ -571,7 +581,7 @@ async function renderMembers() {
         avatar.textContent = getInitial(member.display_name || member.username);
 
         const nameWrap = document.createElement("div");
-        const name = document.createElement("div");
+        const name     = document.createElement("div");
         name.className = "member-card-name";
         name.textContent = member.display_name || member.username || "Unknown";
 
@@ -607,8 +617,15 @@ async function renderMembers() {
 /* PROFILE */
 async function openProfile(userId) {
     viewingProfileId = userId;
-    let profile = members.find(m => m.id === userId) || (await sb.from("profiles").select("*").eq("id", userId).maybeSingle()).data;
-    if (!profile) return alert("Profile not found.");
+
+    // Always fetch fresh from DB so roles/tags are up to date
+    const { data: profile, error } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
+    if (error || !profile) { alert("Profile not found."); return; }
+    if (!Array.isArray(profile.extra_tags)) profile.extra_tags = [];
+
+    // Update local cache
+    const idx = members.findIndex(m => m.id === userId);
+    if (idx !== -1) members[idx] = profile;
 
     profileAvatar.textContent = getInitial(profile.display_name || profile.username);
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
@@ -632,16 +649,16 @@ profileEditBackBtn.addEventListener("click", () => openProfile(currentUser.id));
 
 editProfileBtn.addEventListener("click", () => {
     editDisplayName.value = currentProfile.display_name || "";
-    editUsername.value = currentProfile.username || "";
-    editBio.value = currentProfile.bio || "";
+    editUsername.value    = currentProfile.username || "";
+    editBio.value         = currentProfile.bio || "";
     profileEditError.classList.add("hidden");
     showCommunitySection(profileEditView);
 });
 
 saveProfileBtn.addEventListener("click", async () => {
     const displayName = editDisplayName.value.trim();
-    const username = editUsername.value.trim();
-    const bio = editBio.value.trim();
+    const username    = editUsername.value.trim();
+    const bio         = editBio.value.trim();
 
     if (!displayName || !username) {
         profileEditError.textContent = "Display name and username are required.";
@@ -669,12 +686,12 @@ saveProfileBtn.addEventListener("click", async () => {
     }
 
     currentProfile.display_name = displayName;
-    currentProfile.username = username;
-    currentProfile.bio = bio;
+    currentProfile.username     = username;
+    currentProfile.bio          = bio;
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL - FIXED PERSISTENCE ========== */
+/* ========== ADMIN PANEL ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -682,82 +699,129 @@ async function renderAdminPanel() {
     loading.textContent = "Loading members...";
     adminMembersList.appendChild(loading);
 
-    members = await fetchMembers();  // Always fetch fresh data
+    // Always fetch fresh server data — this is the single source of truth
+    members = await fetchMembers();
     adminMembersList.innerHTML = "";
 
     const isOwner = isOwnerUser(currentProfile);
 
-    members.forEach(member => {
-        const card = document.createElement("div");
-        card.className = "admin-member-card";
+    members.forEach(member => renderAdminCard(member, isOwner));
+}
 
-        const header = document.createElement("div");
-        header.className = "admin-member-header";
+/**
+ * Renders one admin card. Extracted so we can re-render a single card in-place
+ * after a successful save, without a full panel reload.
+ */
+function renderAdminCard(member, isOwner) {
+    const card = document.createElement("div");
+    card.className = "admin-member-card";
+    card.dataset.memberId = member.id;
 
-        const identity = document.createElement("div");
-        identity.className = "admin-member-identity";
+    // ── Identity ──────────────────────────────────────────────────────────
+    const header   = document.createElement("div");
+    header.className = "admin-member-header";
 
-        const avatar = document.createElement("div");
-        avatar.className = "member-avatar";
-        avatar.textContent = getInitial(member.display_name || member.username);
+    const identity = document.createElement("div");
+    identity.className = "admin-member-identity";
 
-        const nameWrap = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "member-card-name";
-        name.textContent = member.display_name || member.username || "Unknown";
+    const avatar = document.createElement("div");
+    avatar.className = "member-avatar";
+    avatar.textContent = getInitial(member.display_name || member.username);
 
-        const badges = document.createElement("div");
-        badges.className = "member-badges";
-        renderBadges(badges, member);
+    const nameWrap = document.createElement("div");
+    const name     = document.createElement("div");
+    name.className = "member-card-name";
+    name.textContent = member.display_name || member.username || "Unknown";
 
-        nameWrap.appendChild(name);
-        nameWrap.appendChild(badges);
-        identity.appendChild(avatar);
-        identity.appendChild(nameWrap);
+    const badges = document.createElement("div");
+    badges.className = "member-badges";
+    renderBadges(badges, member);
 
-        const controls = document.createElement("div");
-        controls.className = "admin-role-controls";
+    nameWrap.appendChild(name);
+    nameWrap.appendChild(badges);
+    identity.appendChild(avatar);
+    identity.appendChild(nameWrap);
 
-        // Role Select
-        const roleSelect = document.createElement("select");
-        const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
-        const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
+    // ── Controls ──────────────────────────────────────────────────────────
+    const controls = document.createElement("div");
+    controls.className = "admin-role-controls";
 
-        rolesToShow.forEach(role => {
-            const opt = document.createElement("option");
-            opt.value = role;
-            opt.textContent = role;
-            if (role === member.role) opt.selected = true;
-            roleSelect.appendChild(opt);
-        });
+    // Status label (shows save result)
+    const statusLabel = document.createElement("span");
+    statusLabel.className = "admin-save-status";
+    statusLabel.style.cssText = "font-size:.8rem;color:#4ade80;display:none;";
 
-        if ((!isOwner && (member.role === "Admin" || member.role === "Owner")) || member.id === currentUser.id) {
-            roleSelect.disabled = true;
+    function showStatus(msg, ok = true) {
+        statusLabel.textContent = msg;
+        statusLabel.style.color = ok ? "#4ade80" : "#f87171";
+        statusLabel.style.display = "inline";
+        setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
+    }
+
+    // ── Role select ───────────────────────────────────────────────────────
+    const roleSelect = document.createElement("select");
+
+    // Which roles can this admin assign?
+    const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
+    const rolesToShow    = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
+
+    rolesToShow.forEach(role => {
+        const opt = document.createElement("option");
+        opt.value = role;
+        opt.textContent = role;
+        if (role === member.role) opt.selected = true;
+        roleSelect.appendChild(opt);
+    });
+
+    // Disable if not allowed to change
+    const canChangeRole = isOwner && member.id !== currentUser.id;
+    if (!canChangeRole) roleSelect.disabled = true;
+
+    roleSelect.addEventListener("change", async () => {
+        const newRole    = roleSelect.value;
+        const prevRole   = member.role;
+        roleSelect.disabled = true;
+
+        const { data: saved, error } = await sb
+            .from("profiles")
+            .update({ role: newRole })
+            .eq("id", member.id)
+            .select("role, extra_tags")
+            .single();
+
+        roleSelect.disabled = false;
+
+        if (error) {
+            console.error("Role save error:", error);
+            showStatus("❌ " + (error.message || "Save failed"), false);
+            roleSelect.value = prevRole;   // revert UI
+            return;
         }
 
-        roleSelect.addEventListener("change", async () => {
-            const newRole = roleSelect.value;
-            const { error } = await sb.from("profiles").update({ role: newRole }).eq("id", member.id);
+        // Update local member object from what the DB actually stored
+        member.role       = saved.role;
+        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
+        renderBadges(badges, member);
+        showStatus("✓ Role saved");
 
-            if (error) {
-                alert("Could not update role: " + error.message);
-                roleSelect.value = member.role;
-                return;
-            }
+        // If this is the current user's own card, refresh currentProfile
+        if (member.id === currentUser.id) {
+            currentProfile.role = member.role;
+        }
+    });
 
-            member.role = newRole;
-            renderBadges(badges, member);
-        });
+    controls.appendChild(roleSelect);
 
-        controls.appendChild(roleSelect);
+    // ── Tag add select ────────────────────────────────────────────────────
+    const tagSelect  = document.createElement("select");
+    const blankOpt   = document.createElement("option");
+    blankOpt.value   = "";
+    blankOpt.textContent = "+ Add tag";
+    tagSelect.appendChild(blankOpt);
 
-        // Tag Select
-        const tagSelect = document.createElement("select");
-        const blankOpt = document.createElement("option");
-        blankOpt.value = "";
-        blankOpt.textContent = "+ Add tag";
-        tagSelect.appendChild(blankOpt);
-
+    function rebuildTagSelect() {
+        // Remove all options except the blank one
+        while (tagSelect.options.length > 1) tagSelect.remove(1);
         TAG_OPTIONS.forEach(tag => {
             if (!(member.extra_tags || []).includes(tag)) {
                 const opt = document.createElement("option");
@@ -766,56 +830,96 @@ async function renderAdminPanel() {
                 tagSelect.appendChild(opt);
             }
         });
+    }
 
-        tagSelect.addEventListener("change", async () => {
-            if (!tagSelect.value) return;
-            const newTags = [...(member.extra_tags || []), tagSelect.value];
-            const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
+    rebuildTagSelect();
 
-            if (error) {
-                alert("Could not add tag: " + error.message);
-                tagSelect.value = "";
-                return;
-            }
+    tagSelect.addEventListener("change", async () => {
+        const tag = tagSelect.value;
+        if (!tag) return;
 
-            member.extra_tags = newTags;
-            renderBadges(badges, member);
-            tagSelect.value = "";
-        });
+        const newTags = [...(member.extra_tags || []), tag];
+        tagSelect.disabled = true;
 
-        controls.appendChild(tagSelect);
+        const { data: saved, error } = await sb
+            .from("profiles")
+            .update({ extra_tags: newTags })
+            .eq("id", member.id)
+            .select("role, extra_tags")
+            .single();
 
-        // Remove buttons
+        tagSelect.disabled = false;
+        tagSelect.value    = "";
+
+        if (error) {
+            console.error("Tag add error:", error);
+            showStatus("❌ " + (error.message || "Save failed"), false);
+            return;
+        }
+
+        // Confirm from DB what was actually stored
+        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
+        renderBadges(badges, member);
+        rebuildTagSelect();
+        rebuildRemoveButtons();
+        showStatus("✓ Tag saved");
+    });
+
+    controls.appendChild(tagSelect);
+
+    // ── Remove-tag buttons ────────────────────────────────────────────────
+    const removeWrap = document.createElement("div");
+    removeWrap.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
+
+    function rebuildRemoveButtons() {
+        removeWrap.innerHTML = "";
         (member.extra_tags || []).forEach(tag => {
             const removeBtn = document.createElement("button");
-            removeBtn.className = "btn btn-sm";
-            removeBtn.textContent = "Remove " + tag;
+            removeBtn.className = "btn btn-sm btn-danger";
+            removeBtn.textContent = "✕ " + tag;
             removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
-                const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
+                removeBtn.disabled = true;
+
+                const { data: saved, error } = await sb
+                    .from("profiles")
+                    .update({ extra_tags: newTags })
+                    .eq("id", member.id)
+                    .select("role, extra_tags")
+                    .single();
 
                 if (error) {
-                    alert("Could not remove tag: " + error.message);
+                    console.error("Tag remove error:", error);
+                    showStatus("❌ " + (error.message || "Save failed"), false);
+                    removeBtn.disabled = false;
                     return;
                 }
 
-                member.extra_tags = newTags;
+                member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
                 renderBadges(badges, member);
+                rebuildTagSelect();
+                rebuildRemoveButtons();
+                showStatus("✓ Tag removed");
             });
-            controls.appendChild(removeBtn);
+            removeWrap.appendChild(removeBtn);
         });
+    }
 
-        const viewBtn = document.createElement("button");
-        viewBtn.className = "btn btn-sm";
-        viewBtn.textContent = "View Profile";
-        viewBtn.addEventListener("click", () => openProfile(member.id));
-        controls.appendChild(viewBtn);
+    rebuildRemoveButtons();
+    controls.appendChild(removeWrap);
+    controls.appendChild(statusLabel);
 
-        header.appendChild(identity);
-        header.appendChild(controls);
-        card.appendChild(header);
-        adminMembersList.appendChild(card);
-    });
+    // ── View profile btn ──────────────────────────────────────────────────
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn btn-sm";
+    viewBtn.textContent = "View Profile";
+    viewBtn.addEventListener("click", () => openProfile(member.id));
+    controls.appendChild(viewBtn);
+
+    header.appendChild(identity);
+    header.appendChild(controls);
+    card.appendChild(header);
+    adminMembersList.appendChild(card);
 }
 
 /* PAGE FUNCTIONS */
@@ -839,13 +943,13 @@ function openEditor(id) {
         if (!p) return;
         currentPageId = id;
         editorHeading.textContent = "Edit Page";
-        pageTitleInput.value = p.title;
+        pageTitleInput.value   = p.title;
         pageCategoryInput.value = p.category;
         pageContentInput.value = p.content;
     } else {
         currentPageId = null;
         editorHeading.textContent = "New Page";
-        pageTitleInput.value = "";
+        pageTitleInput.value   = "";
         pageCategoryInput.value = activeCategory !== "All" ? activeCategory : "Ideas";
         pageContentInput.value = "";
     }
@@ -854,9 +958,9 @@ function openEditor(id) {
 }
 
 async function savePage() {
-    const title = pageTitleInput.value.trim();
+    const title    = pageTitleInput.value.trim();
     const category = pageCategoryInput.value;
-    const text = pageContentInput.value;
+    const text     = pageContentInput.value;
 
     if (!title) return pageTitleInput.focus();
 
@@ -898,7 +1002,7 @@ async function deletePage() {
     confirmBar.id = "deleteConfirmBar";
     confirmBar.className = "delete-confirm";
 
-    const text = document.createElement("span");
+    const text   = document.createElement("span");
     text.textContent = `Delete "${p.title}"? This cannot be undone.`;
 
     const yesBtn = document.createElement("button");
