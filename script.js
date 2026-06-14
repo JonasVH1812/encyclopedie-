@@ -16,13 +16,13 @@ let currentPageId = null;
 let activeCategory = "All";
 let currentUser = null;
 let currentProfile = null;
-let authMode = "signin"; // "signin" | "signup"
-let viewMode = "my"; // "my" | "community"
-let communitySubview = "feed"; // "feed" | "members" | "admin"
+let authMode = "signin";
+let viewMode = "my";
+let communitySubview = "feed";
 
 let posts = [];
 let members = [];
-let profileStatsMap = {}; // id -> { post_count }
+let profileStatsMap = {};
 let viewingProfileId = null;
 
 const OWNER_EMAIL = "removed@example.com";
@@ -248,11 +248,7 @@ logoutBtn.addEventListener("click", async () => {
 /* ===== AUTH STATE LISTENER ===== */
 sb.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
-    if (currentUser) {
-        showApp();
-    } else {
-        showAuth();
-    }
+    if (currentUser) showApp(); else showAuth();
 });
 
 function showAuth() {
@@ -276,14 +272,10 @@ async function showApp() {
     renderHome();
 }
 
-/* ===== DATA FETCH ===== */
+/* ===== DATA ===== */
 async function fetchProfile() {
     let { data, error } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
-
-    if (error) {
-        console.error(error);
-        return;
-    }
+    if (error) console.error(error);
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
@@ -295,7 +287,6 @@ async function fetchProfile() {
         }).select().single();
         data = insertRes.data;
     }
-
     currentProfile = data;
 }
 
@@ -313,7 +304,7 @@ async function fetchPages() {
 }
 
 /* ===== NAVBAR & HOME ===== */
-function renderNavbar() { /* ... (unchanged) */ 
+function renderNavbar() {
     navbar.innerHTML = "";
     CATEGORIES.forEach(cat => {
         const li = document.createElement("li");
@@ -349,7 +340,7 @@ function renderNavbar() { /* ... (unchanged) */
     navbar.appendChild(communityLi);
 }
 
-function renderHome() { /* ... (unchanged) */ 
+function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
     content.innerHTML = "";
@@ -360,7 +351,7 @@ function renderHome() { /* ... (unchanged) */
     if (sorted.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = activeCategory === "All" ? "No pages yet. Click '+ New Page'." : `No pages in "${activeCategory}".`;
+        empty.textContent = activeCategory === "All" ? "No pages yet. Click '+ New Page' to get started." : `No pages in "${activeCategory}" yet.`;
         content.appendChild(empty);
         return;
     }
@@ -374,12 +365,15 @@ function renderHome() { /* ... (unchanged) */
         h3.textContent = p.title;
         const snippet = document.createElement("p");
         snippet.className = "card-snippet";
-        snippet.textContent = p.content.substring(0, 120) + "...";
+        snippet.textContent = p.content;
         const date = document.createElement("div");
         date.className = "card-date";
         date.textContent = "Updated " + formatDate(p.updated);
 
-        article.append(cat, h3, snippet, date);
+        article.appendChild(cat);
+        article.appendChild(h3);
+        article.appendChild(snippet);
+        article.appendChild(date);
         article.addEventListener("click", () => openPage(p.id));
         content.appendChild(article);
     });
@@ -443,7 +437,7 @@ async function renderFeed() {
         console.error(error);
         const errDiv = document.createElement("div");
         errDiv.className = "empty-state";
-        errDiv.textContent = "Could not load posts.";
+        errDiv.textContent = "Could not load community posts.";
         postsList.appendChild(errDiv);
         return;
     }
@@ -453,7 +447,7 @@ async function renderFeed() {
     if (posts.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "No posts yet. Be the first!";
+        empty.textContent = "No posts yet. Be the first to share something!";
         postsList.appendChild(empty);
         return;
     }
@@ -467,8 +461,12 @@ async function renderFeed() {
 
         const authorLink = document.createElement("a");
         authorLink.className = "post-author-link";
+        authorLink.href = "#";
         authorLink.textContent = post.profiles?.display_name || "Unknown";
-        authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
+        authorLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            openProfile(post.user_id);
+        });
         header.appendChild(authorLink);
 
         if (post.profiles) {
@@ -485,16 +483,22 @@ async function renderFeed() {
 
         const h3 = document.createElement("h3");
         h3.textContent = post.title;
+
         const contentP = document.createElement("p");
         contentP.className = "post-card-content";
         contentP.textContent = post.content;
+
         const date = document.createElement("div");
         date.className = "post-card-date";
         date.textContent = formatDate(new Date(post.created_at).getTime());
 
-        card.append(header, h3, contentP, date);
+        card.appendChild(header);
+        card.appendChild(h3);
+        card.appendChild(contentP);
+        card.appendChild(date);
 
-        if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
+        const canDelete = post.user_id === currentUser.id || isAdminOrOwner(currentProfile);
+        if (canDelete) {
             const actions = document.createElement("div");
             actions.className = "post-card-actions";
             const delBtn = document.createElement("button");
@@ -511,8 +515,8 @@ async function renderFeed() {
 
 async function deletePost(postId) {
     const { error } = await sb.from("community_posts").delete().eq("id", postId);
-    if (error) alert("Error deleting post");
-    else renderFeed();
+    if (error) alert("Could not delete post: " + error.message);
+    else await renderFeed();
 }
 
 /* POST EDITOR */
@@ -521,53 +525,203 @@ newPostBtn.addEventListener("click", () => {
     postCategoryInput.value = "Discussion";
     postContentInput.value = "";
     showCommunitySection(postEditor);
+    postTitleInput.focus();
 });
 
 cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed));
 
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
-    if (!title) return;
-    const { error } = await sb.from("community_posts").insert({
-        user_id: currentUser.id,
-        title,
-        category: postCategoryInput.value,
-        content: postContentInput.value.trim()
-    });
-    if (error) alert(error.message);
-    else {
+    if (!title) return postTitleInput.focus();
+
+    savePostBtn.disabled = true;
+    savePostBtn.textContent = "Posting...";
+
+    try {
+        const { error } = await sb.from("community_posts").insert({
+            user_id: currentUser.id,
+            title,
+            category: postCategoryInput.value,
+            content: postContentInput.value.trim()
+        });
+        if (error) throw error;
+
         showCommunitySection(communityFeed);
-        renderFeed();
+        await renderFeed();
+    } catch (err) {
+        alert("Could not post: " + (err.message || "unknown error"));
+    } finally {
+        savePostBtn.disabled = false;
+        savePostBtn.textContent = "Post";
     }
 });
 
-/* MEMBERS & PROFILE (shortened for brevity but functional) */
+/* MEMBERS */
 async function fetchMembers() {
-    const { data } = await sb.from("profiles").select("*").order("joined_at");
+    const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
+    if (error) console.error(error);
     return data || [];
 }
 
 async function fetchStats() {
-    const { data } = await sb.from("profile_stats").select("*");
+    const { data, error } = await sb.from("profile_stats").select("*");
+    if (error) return console.error(error);
     profileStatsMap = {};
-    (data || []).forEach(r => profileStatsMap[r.id] = r);
+    (data || []).forEach(row => profileStatsMap[row.id] = row);
 }
 
-async function renderMembers() { /* ... */ 
-    // (same as previous version)
+async function renderMembers() {
     membersList.innerHTML = "";
+    const loading = document.createElement("div");
+    loading.className = "empty-state";
+    loading.textContent = "Loading members...";
+    membersList.appendChild(loading);
+
     members = await fetchMembers();
     await fetchStats();
-    // ... render cards (unchanged logic)
-    // I'll keep it short - copy from your earlier working version if needed
+    membersList.innerHTML = "";
+
+    if (members.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No members found.";
+        membersList.appendChild(empty);
+        return;
+    }
+
+    const roleOrder = { Owner: 0, Admin: 1 };
+    const sorted = [...members].sort((a, b) => {
+        const ra = roleOrder[a.role] ?? 2;
+        const rb = roleOrder[b.role] ?? 2;
+        if (ra !== rb) return ra - rb;
+        return new Date(a.joined_at) - new Date(b.joined_at);
+    });
+
+    sorted.forEach(member => {
+        const card = document.createElement("div");
+        card.className = "member-card";
+
+        const header = document.createElement("div");
+        header.className = "member-card-header";
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+        avatar.textContent = getInitial(member.display_name || member.username);
+
+        const nameWrap = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "member-card-name";
+        name.textContent = member.display_name || member.username || "Unknown";
+
+        const username = document.createElement("div");
+        username.className = "member-card-username";
+        username.textContent = "@" + (member.username || "unknown");
+
+        nameWrap.appendChild(name);
+        nameWrap.appendChild(username);
+
+        header.appendChild(avatar);
+        header.appendChild(nameWrap);
+
+        const badges = document.createElement("div");
+        badges.className = "member-badges";
+        renderBadges(badges, member);
+
+        card.appendChild(header);
+        card.appendChild(badges);
+
+        if (member.bio) {
+            const bio = document.createElement("div");
+            bio.className = "member-card-bio";
+            bio.textContent = member.bio;
+            card.appendChild(bio);
+        }
+
+        card.addEventListener("click", () => openProfile(member.id));
+        membersList.appendChild(card);
+    });
 }
 
-/* ADMIN PANEL - FIXED */
+/* PROFILE VIEW */
+async function openProfile(userId) {
+    viewingProfileId = userId;
+    let profile = members.find(m => m.id === userId);
+    if (!profile) {
+        const { data } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
+        profile = data;
+    }
+    if (!profile) return alert("Profile not found.");
+
+    profileAvatar.textContent = getInitial(profile.display_name || profile.username);
+    profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
+    profileUsername.textContent = "@" + (profile.username || "unknown");
+    renderBadges(profileBadges, profile);
+    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile." : "No bio yet.");
+
+    if (!profileStatsMap[userId]) await fetchStats();
+    const stats = profileStatsMap[userId] || { post_count: 0 };
+    profileStats.innerHTML = `<div class="profile-stat"><span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span></div>`;
+
+    const joinDate = new Date(profile.joined_at);
+    profileMeta.textContent = "Joined " + joinDate.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+
+    editProfileBtn.classList.toggle("hidden", userId !== currentUser.id);
+    showCommunitySection(profileView);
+}
+
+profileBackBtn.addEventListener("click", () => setCommunitySubview(communitySubview === "admin" ? "admin" : "members"));
+profileEditBackBtn.addEventListener("click", () => openProfile(currentUser.id));
+
+editProfileBtn.addEventListener("click", () => {
+    editDisplayName.value = currentProfile.display_name || "";
+    editUsername.value = currentProfile.username || "";
+    editBio.value = currentProfile.bio || "";
+    profileEditError.classList.add("hidden");
+    showCommunitySection(profileEditView);
+});
+
+saveProfileBtn.addEventListener("click", async () => {
+    const displayName = editDisplayName.value.trim();
+    const username = editUsername.value.trim();
+    const bio = editBio.value.trim();
+
+    if (!displayName || !username) {
+        profileEditError.textContent = "Display name and username are required.";
+        profileEditError.classList.remove("hidden");
+        return;
+    }
+
+    saveProfileBtn.disabled = true;
+    saveProfileBtn.textContent = "Saving...";
+
+    const { error } = await sb.from("profiles").update({
+        display_name: displayName,
+        username,
+        bio,
+        updated_at: new Date().toISOString()
+    }).eq("id", currentUser.id);
+
+    saveProfileBtn.disabled = false;
+    saveProfileBtn.textContent = "Save";
+
+    if (error) {
+        profileEditError.textContent = error.message;
+        profileEditError.classList.remove("hidden");
+        return;
+    }
+
+    currentProfile.display_name = displayName;
+    currentProfile.username = username;
+    currentProfile.bio = bio;
+    await openProfile(currentUser.id);
+});
+
+/* ========== ADMIN PANEL - FIXED ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
     loading.className = "empty-state";
-    loading.textContent = "Loading...";
+    loading.textContent = "Loading members...";
     adminMembersList.appendChild(loading);
 
     members = await fetchMembers();
@@ -606,73 +760,92 @@ async function renderAdminPanel() {
         const controls = document.createElement("div");
         controls.className = "admin-role-controls";
 
-        // Role
+        // Role Select
         const roleSelect = document.createElement("select");
-        const available = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
-        available.forEach(r => {
+        const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
+        const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
+
+        rolesToShow.forEach(role => {
             const opt = document.createElement("option");
-            opt.value = r;
-            opt.textContent = r;
-            if (r === member.role) opt.selected = true;
+            opt.value = role;
+            opt.textContent = role;
+            if (role === member.role) opt.selected = true;
             roleSelect.appendChild(opt);
         });
-        if (member.id === currentUser.id || (!isOwner && ["Admin","Owner"].includes(member.role))) roleSelect.disabled = true;
+
+        if ((!isOwner && (member.role === "Admin" || member.role === "Owner")) || member.id === currentUser.id) {
+            roleSelect.disabled = true;
+        }
 
         roleSelect.addEventListener("change", async () => {
             const newRole = roleSelect.value;
             const { error } = await sb.from("profiles").update({ role: newRole }).eq("id", member.id);
+
             if (error) {
-                alert(error.message);
+                alert("Could not update role: " + error.message);
                 roleSelect.value = member.role;
-            } else {
-                member.role = newRole;
-                renderBadges(badges, member);
+                return;
             }
+
+            member.role = newRole;
+            renderBadges(badges, member);
         });
+
         controls.appendChild(roleSelect);
 
-        // Tags
+        // Tag Select
         const tagSelect = document.createElement("select");
-        const blank = document.createElement("option");
-        blank.value = ""; blank.textContent = "+ Add tag";
-        tagSelect.appendChild(blank);
+        const blankOpt = document.createElement("option");
+        blankOpt.value = "";
+        blankOpt.textContent = "+ Add tag";
+        tagSelect.appendChild(blankOpt);
 
         TAG_OPTIONS.forEach(tag => {
             if (!(member.extra_tags || []).includes(tag)) {
                 const opt = document.createElement("option");
-                opt.value = tag; opt.textContent = tag;
+                opt.value = tag;
+                opt.textContent = tag;
                 tagSelect.appendChild(opt);
             }
         });
 
         tagSelect.addEventListener("change", async () => {
             if (!tagSelect.value) return;
+
             const newTags = [...(member.extra_tags || []), tagSelect.value];
             const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
-            if (error) alert(error.message);
-            else {
-                member.extra_tags = newTags;
-                renderBadges(badges, member);
+
+            if (error) {
+                alert("Could not add tag: " + error.message);
                 tagSelect.value = "";
+                return;
             }
+
+            member.extra_tags = newTags;
+            renderBadges(badges, member);
+            tagSelect.value = "";
         });
+
         controls.appendChild(tagSelect);
 
-        // Remove buttons
+        // Remove Tag Buttons
         (member.extra_tags || []).forEach(tag => {
-            const btn = document.createElement("button");
-            btn.className = "btn btn-sm";
-            btn.textContent = "Remove " + tag;
-            btn.addEventListener("click", async () => {
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "btn btn-sm";
+            removeBtn.textContent = "Remove " + tag;
+            removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
                 const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
-                if (error) alert(error.message);
-                else {
-                    member.extra_tags = newTags;
-                    renderBadges(badges, member);
+
+                if (error) {
+                    alert("Could not remove tag: " + error.message);
+                    return;
                 }
+
+                member.extra_tags = newTags;
+                renderBadges(badges, member);
             });
-            controls.appendChild(btn);
+            controls.appendChild(removeBtn);
         });
 
         const viewBtn = document.createElement("button");
@@ -688,11 +861,126 @@ async function renderAdminPanel() {
     });
 }
 
-/* PAGE FUNCTIONS */
-function openPage(id) { /* ... keep your existing */ }
-function openEditor(id) { /* ... */ }
-async function savePage() { /* ... */ }
-async function deletePage() { /* ... */ }
+/* ===== PAGE FUNCTIONS ===== */
+function openPage(id) {
+    const p = pages.find(pg => pg.id === id);
+    if (!p) return;
 
-/* INIT */
+    currentPageId = id;
+    pageTitleDisplay.textContent = p.title;
+    pageMeta.textContent = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
+    pageContentDisplay.textContent = p.content;
+
+    editBtn.classList.remove("hidden");
+    deleteBtn.classList.remove("hidden");
+    showOnly(pageView);
+}
+
+function openEditor(id) {
+    if (id) {
+        const p = pages.find(pg => pg.id === id);
+        if (!p) return;
+        currentPageId = id;
+        editorHeading.textContent = "Edit Page";
+        pageTitleInput.value = p.title;
+        pageCategoryInput.value = p.category;
+        pageContentInput.value = p.content;
+    } else {
+        currentPageId = null;
+        editorHeading.textContent = "New Page";
+        pageTitleInput.value = "";
+        pageCategoryInput.value = activeCategory !== "All" ? activeCategory : "Ideas";
+        pageContentInput.value = "";
+    }
+    showOnly(editor);
+    pageTitleInput.focus();
+}
+
+async function savePage() {
+    const title = pageTitleInput.value.trim();
+    const category = pageCategoryInput.value;
+    const text = pageContentInput.value;
+
+    if (!title) return pageTitleInput.focus();
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    try {
+        if (currentPageId) {
+            const { error } = await sb.from("pages").update({
+                title, category, content: text, updated_at: new Date().toISOString()
+            }).eq("id", currentPageId);
+            if (error) throw error;
+        } else {
+            const { data, error } = await sb.from("pages").insert({
+                user_id: currentUser.id, title, category, content: text
+            }).select().single();
+            if (error) throw error;
+            currentPageId = data.id;
+        }
+        await fetchPages();
+        openPage(currentPageId);
+    } catch (err) {
+        alert("Could not save: " + (err.message || "unknown error"));
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+    }
+}
+
+async function deletePage() {
+    if (!currentPageId) return;
+    const p = pages.find(pg => pg.id === currentPageId);
+    if (!p) return;
+
+    let confirmBar = document.getElementById("deleteConfirmBar");
+    if (confirmBar) return confirmBar.remove();
+
+    confirmBar = document.createElement("div");
+    confirmBar.id = "deleteConfirmBar";
+    confirmBar.className = "delete-confirm";
+
+    const text = document.createElement("span");
+    text.textContent = `Delete "${p.title}"? This cannot be undone.`;
+
+    const yesBtn = document.createElement("button");
+    yesBtn.className = "btn btn-danger";
+    yesBtn.textContent = "Yes, delete";
+    yesBtn.addEventListener("click", async () => {
+        yesBtn.disabled = true;
+        yesBtn.textContent = "Deleting...";
+        const { error } = await sb.from("pages").delete().eq("id", currentPageId);
+        if (error) {
+            alert("Could not delete: " + error.message);
+            yesBtn.disabled = false;
+            yesBtn.textContent = "Yes, delete";
+            return;
+        }
+        await fetchPages();
+        currentPageId = null;
+        renderHome();
+    });
+
+    const noBtn = document.createElement("button");
+    noBtn.className = "btn";
+    noBtn.textContent = "Cancel";
+    noBtn.addEventListener("click", () => confirmBar.remove());
+
+    confirmBar.append(text, yesBtn, noBtn);
+    pageView.appendChild(confirmBar);
+}
+
+/* ===== EVENT LISTENERS ===== */
+newPageBtn.addEventListener("click", () => openEditor(null));
+editBtn.addEventListener("click", () => openEditor(currentPageId));
+deleteBtn.addEventListener("click", deletePage);
+closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); });
+saveBtn.addEventListener("click", savePage);
+cancelBtn.addEventListener("click", () => {
+    if (currentPageId) openPage(currentPageId);
+    else renderHome();
+});
+
+/* ===== INIT ===== */
 setAuthMode("signin");
