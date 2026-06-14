@@ -12,14 +12,23 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ===== STATE ===== */
 let pages = [];
-let sharedPages = [];
 let currentPageId = null;
 let activeCategory = "All";
 let currentUser = null;
+let currentProfile = null;
 let authMode = "signin"; // "signin" | "signup"
 let viewMode = "my"; // "my" | "community"
+let communitySubview = "feed"; // "feed" | "members" | "admin"
 
+let posts = [];
+let members = [];
+let profileStatsMap = {}; // id -> { post_count }
+let viewingProfileId = null;
+
+const OWNER_EMAIL = "removed@example.com";
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
+const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
+const TAG_OPTIONS = ["VIP", "Contributor", "Moderator", "Co-Owner"];
 
 /* ===== ELEMENTS ===== */
 const pageTitle = document.getElementById("pageTitle");
@@ -50,9 +59,43 @@ const editorHeading = document.getElementById("editorHeading");
 const pageTitleInput = document.getElementById("pageTitleInput");
 const pageCategoryInput = document.getElementById("pageCategoryInput");
 const pageContentInput = document.getElementById("pageContentInput");
-const pageSharedInput = document.getElementById("pageSharedInput");
 
-const communityContent = document.getElementById("communityContent");
+const communityTab = document.getElementById("communityTab");
+const communityFeed = document.getElementById("communityFeed");
+const communityMembers = document.getElementById("communityMembers");
+const communityAdmin = document.getElementById("communityAdmin");
+const profileView = document.getElementById("profileView");
+const postEditor = document.getElementById("postEditor");
+
+const postsList = document.getElementById("postsList");
+const membersList = document.getElementById("membersList");
+const adminMembersList = document.getElementById("adminMembersList");
+const adminSubnavBtn = document.getElementById("adminSubnavBtn");
+
+const newPostBtn = document.getElementById("newPostBtn");
+const postTitleInput = document.getElementById("postTitleInput");
+const postCategoryInput = document.getElementById("postCategoryInput");
+const postContentInput = document.getElementById("postContentInput");
+const savePostBtn = document.getElementById("savePostBtn");
+const cancelPostBtn = document.getElementById("cancelPostBtn");
+
+const profileBackBtn = document.getElementById("profileBackBtn");
+const profileAvatar = document.getElementById("profileAvatar");
+const profileDisplayName = document.getElementById("profileDisplayName");
+const profileUsername = document.getElementById("profileUsername");
+const profileBadges = document.getElementById("profileBadges");
+const profileBio = document.getElementById("profileBio");
+const profileStats = document.getElementById("profileStats");
+const profileMeta = document.getElementById("profileMeta");
+const editProfileBtn = document.getElementById("editProfileBtn");
+
+const profileEditView = document.getElementById("profileEditView");
+const profileEditBackBtn = document.getElementById("profileEditBackBtn");
+const editDisplayName = document.getElementById("editDisplayName");
+const editUsername = document.getElementById("editUsername");
+const editBio = document.getElementById("editBio");
+const profileEditError = document.getElementById("profileEditError");
+const saveProfileBtn = document.getElementById("saveProfileBtn");
 
 const newPageBtn = document.getElementById("newPageBtn");
 const editBtn = document.getElementById("editBtn");
@@ -73,13 +116,52 @@ function formatDate(ts) {
 }
 
 function showOnly(section) {
-    [hero, content, communityContent, pageView, editor].forEach(el => el.classList.add("hidden"));
+    [hero, content, communityTab, pageView, editor].forEach(el => el.classList.add("hidden"));
+    section.classList.remove("hidden");
+}
+
+function showCommunitySection(section) {
+    [communityFeed, communityMembers, communityAdmin, profileView, profileEditView, postEditor].forEach(el => el.classList.add("hidden"));
     section.classList.remove("hidden");
 }
 
 function getDisplayName(user) {
     if (!user) return "";
     return user.user_metadata?.name || user.email?.split("@")[0] || "User";
+}
+
+function getInitial(name) {
+    return (name || "?").trim().charAt(0).toUpperCase();
+}
+
+function badgeClass(role) {
+    const key = (role || "Member").toLowerCase().replace(/\s+/g, "-");
+    return "badge badge-" + key;
+}
+
+function renderBadges(container, profile) {
+    container.innerHTML = "";
+
+    const role = profile.role || "Member";
+    const roleBadge = document.createElement("span");
+    roleBadge.className = badgeClass(role);
+    roleBadge.textContent = role;
+    container.appendChild(roleBadge);
+
+    (profile.extra_tags || []).forEach(tag => {
+        const span = document.createElement("span");
+        span.className = badgeClass(tag);
+        span.textContent = tag;
+        container.appendChild(span);
+    });
+}
+
+function isAdminOrOwner(profile) {
+    return profile && (profile.role === "Owner" || profile.role === "Admin");
+}
+
+function isOwnerUser(profile) {
+    return profile && profile.role === "Owner";
 }
 
 /* ===== AUTH UI ===== */
@@ -191,9 +273,44 @@ async function showApp() {
     pageTitle.textContent = `Encyclopedie van ${name}`;
     welcomeHeading.textContent = `Welcome, ${name}`;
 
+    await fetchProfile();
     await fetchPages();
     renderNavbar();
     renderHome();
+}
+
+/* ===== DATA: FETCH PROFILE ===== */
+async function fetchProfile() {
+    let { data, error } = await sb
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+    if (error) {
+        console.error(error);
+        currentProfile = null;
+        return;
+    }
+
+    if (!data) {
+        // Profile may not exist yet if trigger hasn't run - create one
+        const isOwner = currentUser.email === OWNER_EMAIL;
+        const insertRes = await sb
+            .from("profiles")
+            .insert({
+                id: currentUser.id,
+                username: currentUser.email.split("@")[0],
+                display_name: getDisplayName(currentUser),
+                role: isOwner ? "Owner" : "Member"
+            })
+            .select()
+            .single();
+
+        data = insertRes.data;
+    }
+
+    currentProfile = data;
 }
 
 /* ===== DATA: FETCH ===== */
@@ -214,7 +331,6 @@ async function fetchPages() {
         title: row.title,
         category: row.category,
         content: row.content,
-        shared: row.shared,
         created: new Date(row.created_at).getTime(),
         updated: new Date(row.updated_at).getTime()
     }));
@@ -262,7 +378,7 @@ function renderNavbar() {
         viewMode = "community";
         currentPageId = null;
         renderNavbar();
-        await renderCommunity();
+        await enterCommunity();
     });
 
     communityLi.appendChild(communityLink);
@@ -308,136 +424,613 @@ function renderHome() {
 
         const date = document.createElement("div");
         date.className = "card-date";
-        date.textContent = "Updated " + formatDate(p.updated)
-            + (p.shared ? " · Shared with Community" : "");
+        date.textContent = "Updated " + formatDate(p.updated);
 
         article.appendChild(cat);
         article.appendChild(h3);
         article.appendChild(snippet);
         article.appendChild(date);
 
-        article.addEventListener("click", () => openPage(p.id, "my"));
+        article.addEventListener("click", () => openPage(p.id));
 
         content.appendChild(article);
     });
 }
 
-/* ===== RENDER COMMUNITY ===== */
-async function renderCommunity() {
-    showOnly(communityContent);
+/* ===================== COMMUNITY MODULE ===================== */
+
+async function enterCommunity() {
+    showOnly(communityTab);
     hero.classList.add("hidden");
 
-    communityContent.innerHTML = "";
+    // Show/hide admin subnav based on role
+    if (isAdminOrOwner(currentProfile)) {
+        adminSubnavBtn.classList.remove("hidden");
+    } else {
+        adminSubnavBtn.classList.add("hidden");
+        if (communitySubview === "admin") {
+            communitySubview = "feed";
+        }
+    }
+
+    setCommunitySubview(communitySubview);
+}
+
+function setCommunitySubview(view) {
+    communitySubview = view;
+
+    document.querySelectorAll(".subnav-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.subview === view);
+    });
+
+    if (view === "feed") {
+        showCommunitySection(communityFeed);
+        renderFeed();
+    } else if (view === "members") {
+        showCommunitySection(communityMembers);
+        renderMembers();
+    } else if (view === "admin") {
+        showCommunitySection(communityAdmin);
+        renderAdminPanel();
+    }
+}
+
+document.querySelectorAll(".subnav-btn").forEach(btn => {
+    btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview));
+});
+
+/* ---------- FEED ---------- */
+async function renderFeed() {
+    postsList.innerHTML = "";
 
     const loading = document.createElement("div");
     loading.className = "empty-state";
-    loading.textContent = "Loading shared pages...";
-    communityContent.appendChild(loading);
+    loading.textContent = "Loading posts...";
+    postsList.appendChild(loading);
 
     const { data, error } = await sb
-        .from("pages")
-        .select("*")
-        .eq("shared", true)
-        .order("updated_at", { ascending: false });
+        .from("community_posts")
+        .select("*, profiles(display_name, username, role, extra_tags)")
+        .order("created_at", { ascending: false });
 
-    communityContent.innerHTML = "";
+    postsList.innerHTML = "";
 
     if (error) {
+        console.error(error);
         const errDiv = document.createElement("div");
         errDiv.className = "empty-state";
-        errDiv.textContent = "Could not load community pages.";
-        communityContent.appendChild(errDiv);
+        errDiv.textContent = "Could not load community posts.";
+        postsList.appendChild(errDiv);
         return;
     }
 
-    sharedPages = (data || []).map(row => ({
-        id: row.id,
-        title: row.title,
-        category: row.category,
-        content: row.content,
-        author: row.author_name || "Anonymous",
-        created: new Date(row.created_at).getTime(),
-        updated: new Date(row.updated_at).getTime()
-    }));
+    posts = data || [];
 
-    if (sharedPages.length === 0) {
+    if (posts.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "No shared pages yet. Be the first to share an idea!";
-        communityContent.appendChild(empty);
+        empty.textContent = "No posts yet. Be the first to share something!";
+        postsList.appendChild(empty);
         return;
     }
 
-    sharedPages.forEach(p => {
-        const article = document.createElement("article");
+    posts.forEach(post => {
+        const card = document.createElement("div");
+        card.className = "post-card";
 
-        const cat = document.createElement("span");
-        cat.className = "card-category";
-        cat.textContent = p.category;
+        const header = document.createElement("div");
+        header.className = "post-card-header";
+
+        const authorLink = document.createElement("a");
+        authorLink.className = "post-author-link";
+        authorLink.href = "#";
+        authorLink.textContent = post.profiles?.display_name || "Unknown";
+        authorLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            openProfile(post.user_id);
+        });
+        header.appendChild(authorLink);
+
+        if (post.profiles) {
+            const badgeWrap = document.createElement("span");
+            badgeWrap.className = "member-badges";
+            renderBadges(badgeWrap, post.profiles);
+            header.appendChild(badgeWrap);
+        }
+
+        const catSpan = document.createElement("span");
+        catSpan.className = "post-card-category";
+        catSpan.textContent = post.category;
+        header.appendChild(catSpan);
 
         const h3 = document.createElement("h3");
-        h3.textContent = p.title;
+        h3.textContent = post.title;
 
-        const author = document.createElement("div");
-        author.className = "card-author";
-        author.textContent = "by " + p.author;
-
-        const snippet = document.createElement("p");
-        snippet.className = "card-snippet";
-        snippet.textContent = p.content;
+        const contentP = document.createElement("p");
+        contentP.className = "post-card-content";
+        contentP.textContent = post.content;
 
         const date = document.createElement("div");
-        date.className = "card-date";
-        date.textContent = "Updated " + formatDate(p.updated);
+        date.className = "post-card-date";
+        date.textContent = formatDate(new Date(post.created_at).getTime());
 
-        article.appendChild(cat);
-        article.appendChild(h3);
-        article.appendChild(author);
-        article.appendChild(snippet);
-        article.appendChild(date);
+        card.appendChild(header);
+        card.appendChild(h3);
+        card.appendChild(contentP);
+        card.appendChild(date);
 
-        article.addEventListener("click", () => openPage(p.id, "community"));
+        // Delete button: owner of post, or admin/owner role
+        const canDelete = post.user_id === currentUser.id || isAdminOrOwner(currentProfile);
+        if (canDelete) {
+            const actions = document.createElement("div");
+            actions.className = "post-card-actions";
 
-        communityContent.appendChild(article);
+            const delBtn = document.createElement("button");
+            delBtn.className = "btn btn-danger btn-sm";
+            delBtn.textContent = "Delete";
+            delBtn.addEventListener("click", () => deletePost(post.id));
+
+            actions.appendChild(delBtn);
+            card.appendChild(actions);
+        }
+
+        postsList.appendChild(card);
+    });
+}
+
+async function deletePost(postId) {
+    const { error } = await sb
+        .from("community_posts")
+        .delete()
+        .eq("id", postId);
+
+    if (error) {
+        alert("Could not delete post: " + error.message);
+        return;
+    }
+
+    await renderFeed();
+}
+
+/* ---------- POST EDITOR ---------- */
+newPostBtn.addEventListener("click", () => {
+    postTitleInput.value = "";
+    postCategoryInput.value = "Discussion";
+    postContentInput.value = "";
+    showCommunitySection(postEditor);
+    postTitleInput.focus();
+});
+
+cancelPostBtn.addEventListener("click", () => {
+    showCommunitySection(communityFeed);
+});
+
+savePostBtn.addEventListener("click", async () => {
+    const title = postTitleInput.value.trim();
+    const category = postCategoryInput.value;
+    const text = postContentInput.value.trim();
+
+    if (!title) {
+        postTitleInput.focus();
+        return;
+    }
+
+    savePostBtn.disabled = true;
+    savePostBtn.textContent = "Posting...";
+
+    try {
+        const { error } = await sb
+            .from("community_posts")
+            .insert({
+                user_id: currentUser.id,
+                title,
+                category,
+                content: text
+            });
+
+        if (error) throw error;
+
+        showCommunitySection(communityFeed);
+        await renderFeed();
+    } catch (err) {
+        alert("Could not post: " + (err.message || "unknown error"));
+    } finally {
+        savePostBtn.disabled = false;
+        savePostBtn.textContent = "Post";
+    }
+});
+
+/* ---------- MEMBERS ---------- */
+async function fetchMembers() {
+    const { data, error } = await sb
+        .from("profiles")
+        .select("*")
+        .order("joined_at", { ascending: true });
+
+    if (error) {
+        console.error(error);
+        return [];
+    }
+
+    return data || [];
+}
+
+async function fetchStats() {
+    const { data, error } = await sb
+        .from("profile_stats")
+        .select("*");
+
+    if (error) {
+        console.error(error);
+        return;
+    }
+
+    profileStatsMap = {};
+    (data || []).forEach(row => {
+        profileStatsMap[row.id] = row;
+    });
+}
+
+async function renderMembers() {
+    membersList.innerHTML = "";
+
+    const loading = document.createElement("div");
+    loading.className = "empty-state";
+    loading.textContent = "Loading members...";
+    membersList.appendChild(loading);
+
+    members = await fetchMembers();
+    await fetchStats();
+
+    membersList.innerHTML = "";
+
+    if (members.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No members found.";
+        membersList.appendChild(empty);
+        return;
+    }
+
+    // Sort: Owner first, then Admins, then everyone else by join date
+    const roleOrder = { Owner: 0, Admin: 1 };
+    const sorted = [...members].sort((a, b) => {
+        const ra = roleOrder[a.role] ?? 2;
+        const rb = roleOrder[b.role] ?? 2;
+        if (ra !== rb) return ra - rb;
+        return new Date(a.joined_at) - new Date(b.joined_at);
+    });
+
+    sorted.forEach(member => {
+        const card = document.createElement("div");
+        card.className = "member-card";
+
+        const header = document.createElement("div");
+        header.className = "member-card-header";
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+        avatar.textContent = getInitial(member.display_name || member.username);
+
+        const nameWrap = document.createElement("div");
+
+        const name = document.createElement("div");
+        name.className = "member-card-name";
+        name.textContent = member.display_name || member.username || "Unknown";
+
+        const username = document.createElement("div");
+        username.className = "member-card-username";
+        username.textContent = "@" + (member.username || "unknown");
+
+        nameWrap.appendChild(name);
+        nameWrap.appendChild(username);
+
+        header.appendChild(avatar);
+        header.appendChild(nameWrap);
+
+        const badges = document.createElement("div");
+        badges.className = "member-badges";
+        renderBadges(badges, member);
+
+        card.appendChild(header);
+        card.appendChild(badges);
+
+        if (member.bio) {
+            const bio = document.createElement("div");
+            bio.className = "member-card-bio";
+            bio.textContent = member.bio;
+            card.appendChild(bio);
+        }
+
+        card.addEventListener("click", () => openProfile(member.id));
+
+        membersList.appendChild(card);
+    });
+}
+
+/* ---------- PROFILE VIEW ---------- */
+async function openProfile(userId) {
+    viewingProfileId = userId;
+
+    let profile = members.find(m => m.id === userId);
+
+    if (!profile) {
+        const { data } = await sb
+            .from("profiles")
+            .select("*")
+            .eq("id", userId)
+            .maybeSingle();
+        profile = data;
+    }
+
+    if (!profile) {
+        alert("Profile not found.");
+        return;
+    }
+
+    profileAvatar.textContent = getInitial(profile.display_name || profile.username);
+    profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
+    profileUsername.textContent = "@" + (profile.username || "unknown");
+    renderBadges(profileBadges, profile);
+    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile to add one!" : "No bio yet.");
+
+    if (!profileStatsMap[userId]) {
+        await fetchStats();
+    }
+    const stats = profileStatsMap[userId] || { post_count: 0 };
+
+    profileStats.innerHTML = "";
+    const postStat = document.createElement("div");
+    postStat.className = "profile-stat";
+    postStat.innerHTML = `<span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span>`;
+    profileStats.appendChild(postStat);
+
+    const joinDate = new Date(profile.joined_at);
+    profileMeta.textContent = "Joined " + joinDate.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+
+    // Show "Edit Profile" button only on own profile
+    if (userId === currentUser.id) {
+        editProfileBtn.classList.remove("hidden");
+        editProfileBtn.dataset.profileId = profile.id;
+    } else {
+        editProfileBtn.classList.add("hidden");
+    }
+
+    showCommunitySection(profileView);
+}
+
+profileBackBtn.addEventListener("click", () => {
+    setCommunitySubview(communitySubview === "admin" ? "admin" : "members");
+});
+
+profileEditBackBtn.addEventListener("click", () => openProfile(currentUser.id));
+
+editProfileBtn.addEventListener("click", () => {
+    editDisplayName.value = currentProfile.display_name || "";
+    editUsername.value = currentProfile.username || "";
+    editBio.value = currentProfile.bio || "";
+    profileEditError.classList.add("hidden");
+
+    showCommunitySection(profileEditView);
+});
+
+saveProfileBtn.addEventListener("click", async () => {
+    const displayName = editDisplayName.value.trim();
+    const username = editUsername.value.trim();
+    const bio = editBio.value.trim();
+
+    if (!displayName || !username) {
+        profileEditError.textContent = "Display name and username are required.";
+        profileEditError.classList.remove("hidden");
+        return;
+    }
+
+    saveProfileBtn.disabled = true;
+    saveProfileBtn.textContent = "Saving...";
+
+    const { error } = await sb
+        .from("profiles")
+        .update({
+            display_name: displayName,
+            username,
+            bio,
+            updated_at: new Date().toISOString()
+        })
+        .eq("id", currentUser.id);
+
+    saveProfileBtn.disabled = false;
+    saveProfileBtn.textContent = "Save";
+
+    if (error) {
+        profileEditError.textContent = error.message;
+        profileEditError.classList.remove("hidden");
+        return;
+    }
+
+    currentProfile.display_name = displayName;
+    currentProfile.username = username;
+    currentProfile.bio = bio;
+
+    await openProfile(currentUser.id);
+});
+
+/* ---------- ADMIN PANEL ---------- */
+async function renderAdminPanel() {
+    adminMembersList.innerHTML = "";
+
+    const loading = document.createElement("div");
+    loading.className = "empty-state";
+    loading.textContent = "Loading members...";
+    adminMembersList.appendChild(loading);
+
+    members = await fetchMembers();
+    adminMembersList.innerHTML = "";
+
+    const isOwner = isOwnerUser(currentProfile);
+
+    members.forEach(member => {
+        const card = document.createElement("div");
+        card.className = "admin-member-card";
+
+        const header = document.createElement("div");
+        header.className = "admin-member-header";
+
+        const identity = document.createElement("div");
+        identity.className = "admin-member-identity";
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+        avatar.textContent = getInitial(member.display_name || member.username);
+
+        const nameWrap = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "member-card-name";
+        name.textContent = member.display_name || member.username || "Unknown";
+
+        const badges = document.createElement("div");
+        badges.className = "member-badges";
+        renderBadges(badges, member);
+
+        nameWrap.appendChild(name);
+        nameWrap.appendChild(badges);
+
+        identity.appendChild(avatar);
+        identity.appendChild(nameWrap);
+
+        const controls = document.createElement("div");
+        controls.className = "admin-role-controls";
+
+        // Role select - only Owner can set Admin/Owner roles
+        const roleSelect = document.createElement("select");
+        const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
+
+        // Always include the member's current role even if restricted, so it displays correctly
+        const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
+
+        rolesToShow.forEach(role => {
+            const opt = document.createElement("option");
+            opt.value = role;
+            opt.textContent = role;
+            if (role === member.role) opt.selected = true;
+            roleSelect.appendChild(opt);
+        });
+
+        // Disable role select if not owner and member is currently Admin/Owner (can't demote)
+        if (!isOwner && (member.role === "Admin" || member.role === "Owner")) {
+            roleSelect.disabled = true;
+        }
+        // Can't change own role
+        if (member.id === currentUser.id) {
+            roleSelect.disabled = true;
+        }
+
+        roleSelect.addEventListener("change", async () => {
+            const newRole = roleSelect.value;
+            const { error } = await sb
+                .from("profiles")
+                .update({ role: newRole })
+                .eq("id", member.id);
+
+            if (error) {
+                alert("Could not update role: " + error.message);
+                roleSelect.value = member.role;
+                return;
+            }
+
+            member.role = newRole;
+            renderBadges(badges, member);
+        });
+
+        controls.appendChild(roleSelect);
+
+        // Tag input for extra badges (Admin/Owner can manage these)
+        const tagSelect = document.createElement("select");
+        const blankOpt = document.createElement("option");
+        blankOpt.value = "";
+        blankOpt.textContent = "+ Add tag";
+        tagSelect.appendChild(blankOpt);
+
+        TAG_OPTIONS.forEach(tag => {
+            if (!(member.extra_tags || []).includes(tag)) {
+                const opt = document.createElement("option");
+                opt.value = tag;
+                opt.textContent = tag;
+                tagSelect.appendChild(opt);
+            }
+        });
+
+        tagSelect.addEventListener("change", async () => {
+            if (!tagSelect.value) return;
+
+            const newTags = [...(member.extra_tags || []), tagSelect.value];
+            const { error } = await sb
+                .from("profiles")
+                .update({ extra_tags: newTags })
+                .eq("id", member.id);
+
+            if (error) {
+                alert("Could not add tag: " + error.message);
+                return;
+            }
+
+            member.extra_tags = newTags;
+            renderBadges(badges, member);
+            renderAdminPanel();
+        });
+
+        controls.appendChild(tagSelect);
+
+        // Remove tag buttons
+        (member.extra_tags || []).forEach(tag => {
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "btn btn-sm";
+            removeBtn.textContent = "Remove " + tag;
+            removeBtn.addEventListener("click", async () => {
+                const newTags = (member.extra_tags || []).filter(t => t !== tag);
+                const { error } = await sb
+                    .from("profiles")
+                    .update({ extra_tags: newTags })
+                    .eq("id", member.id);
+
+                if (error) {
+                    alert("Could not remove tag: " + error.message);
+                    return;
+                }
+
+                member.extra_tags = newTags;
+                renderBadges(badges, member);
+                renderAdminPanel();
+            });
+            controls.appendChild(removeBtn);
+        });
+
+        const viewBtn = document.createElement("button");
+        viewBtn.className = "btn btn-sm";
+        viewBtn.textContent = "View Profile";
+        viewBtn.addEventListener("click", () => openProfile(member.id));
+        controls.appendChild(viewBtn);
+
+        header.appendChild(identity);
+        header.appendChild(controls);
+        card.appendChild(header);
+
+        adminMembersList.appendChild(card);
     });
 }
 
 /* ===== OPEN PAGE (VIEW) ===== */
-function openPage(id, source) {
-    source = source || "my";
-
-    let p, isOwner;
-
-    if (source === "community") {
-        p = sharedPages.find(pg => pg.id === id);
-        isOwner = false;
-    } else {
-        p = pages.find(pg => pg.id === id);
-        isOwner = true;
-    }
-
+function openPage(id) {
+    const p = pages.find(pg => pg.id === id);
     if (!p) return;
 
     currentPageId = id;
-    pageView.dataset.source = source;
 
     pageTitleDisplay.textContent = p.title;
-
-    let meta = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
-    if (source === "community") {
-        meta = `By ${p.author} · ${meta}`;
-    }
-    pageMeta.textContent = meta;
-
+    pageMeta.textContent = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
     pageContentDisplay.textContent = p.content;
 
-    if (isOwner) {
-        editBtn.classList.remove("hidden");
-        deleteBtn.classList.remove("hidden");
-    } else {
-        editBtn.classList.add("hidden");
-        deleteBtn.classList.add("hidden");
-    }
+    editBtn.classList.remove("hidden");
+    deleteBtn.classList.remove("hidden");
 
     showOnly(pageView);
 }
@@ -453,14 +1046,12 @@ function openEditor(id) {
         pageTitleInput.value = p.title;
         pageCategoryInput.value = p.category;
         pageContentInput.value = p.content;
-        pageSharedInput.checked = !!p.shared;
     } else {
         currentPageId = null;
         editorHeading.textContent = "New Page";
         pageTitleInput.value = "";
         pageCategoryInput.value = activeCategory !== "All" ? activeCategory : "Ideas";
         pageContentInput.value = "";
-        pageSharedInput.checked = false;
     }
 
     showOnly(editor);
@@ -472,7 +1063,6 @@ async function savePage() {
     const title = pageTitleInput.value.trim();
     const category = pageCategoryInput.value;
     const text = pageContentInput.value;
-    const shared = pageSharedInput.checked;
 
     if (!title) {
         pageTitleInput.focus();
@@ -490,8 +1080,6 @@ async function savePage() {
                     title,
                     category,
                     content: text,
-                    shared,
-                    author_name: shared ? getDisplayName(currentUser) : null,
                     updated_at: new Date().toISOString()
                 })
                 .eq("id", currentPageId);
@@ -504,9 +1092,7 @@ async function savePage() {
                     user_id: currentUser.id,
                     title,
                     category,
-                    content: text,
-                    shared,
-                    author_name: shared ? getDisplayName(currentUser) : null
+                    content: text
                 })
                 .select()
                 .single();
@@ -516,7 +1102,7 @@ async function savePage() {
         }
 
         await fetchPages();
-        openPage(currentPageId, "my");
+        openPage(currentPageId);
     } catch (err) {
         alert("Could not save: " + (err.message || "unknown error"));
     } finally {
@@ -586,22 +1172,14 @@ async function deletePage() {
 newPageBtn.addEventListener("click", () => openEditor(null));
 editBtn.addEventListener("click", () => openEditor(currentPageId));
 deleteBtn.addEventListener("click", deletePage);
-closeBtn.addEventListener("click", async () => {
-    const source = pageView.dataset.source;
+closeBtn.addEventListener("click", () => {
     currentPageId = null;
-
-    if (source === "community") {
-        await renderCommunity();
-    } else {
-        renderHome();
-    }
+    renderHome();
 });
 saveBtn.addEventListener("click", savePage);
 cancelBtn.addEventListener("click", () => {
     if (currentPageId) {
-        openPage(currentPageId, "my");
-    } else if (viewMode === "community") {
-        renderCommunity();
+        openPage(currentPageId);
     } else {
         renderHome();
     }
