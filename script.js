@@ -485,7 +485,15 @@ async function renderFeed() {
 
     const { data, error } = await sb
         .from("community_posts")
-        .select("*, profiles(display_name, username, role, extra_tags)")
+        .select(`
+            *,
+            profiles!fk_community_posts_user_id (
+                display_name, 
+                username, 
+                role, 
+                extra_tags
+            )
+        `)
         .order("created_at", { ascending: false });
 
     postsList.innerHTML = "";
@@ -494,7 +502,7 @@ async function renderFeed() {
         console.error(error);
         const errDiv = document.createElement("div");
         errDiv.className = "empty-state";
-        errDiv.textContent = "Could not load community posts.";
+        errDiv.textContent = "Could not load community posts. Please try again.";
         postsList.appendChild(errDiv);
         return;
     }
