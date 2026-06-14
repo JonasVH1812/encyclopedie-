@@ -16,13 +16,13 @@ let currentPageId = null;
 let activeCategory = "All";
 let currentUser = null;
 let currentProfile = null;
-let authMode = "signin";
-let viewMode = "my";
-let communitySubview = "feed";
+let authMode = "signin"; // "signin" | "signup"
+let viewMode = "my"; // "my" | "community"
+let communitySubview = "feed"; // "feed" | "members" | "admin"
 
 let posts = [];
 let members = [];
-let profileStatsMap = {};
+let profileStatsMap = {}; // id -> { post_count }
 let viewingProfileId = null;
 
 const OWNER_EMAIL = "removed@example.com";
@@ -108,8 +108,11 @@ const logoutBtn = document.getElementById("logoutBtn");
 /* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) 
-         + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(undefined, {
+        year: "numeric", month: "short", day: "numeric"
+    }) + " " + d.toLocaleTimeString(undefined, {
+        hour: "2-digit", minute: "2-digit"
+    });
 }
 
 function showOnly(section) {
@@ -138,6 +141,7 @@ function badgeClass(role) {
 
 function renderBadges(container, profile) {
     container.innerHTML = "";
+
     const role = profile.role || "Member";
     const roleBadge = document.createElement("span");
     roleBadge.className = badgeClass(role);
@@ -211,7 +215,9 @@ authSubmitBtn.addEventListener("click", async () => {
                 password,
                 options: { data: { name: name || email.split("@")[0] } }
             });
+
             if (error) throw error;
+
             if (data.user && !data.session) {
                 authError.textContent = "Account created! Check your email to confirm, then sign in.";
                 authError.classList.remove("hidden");
@@ -222,7 +228,12 @@ authSubmitBtn.addEventListener("click", async () => {
             if (error) throw error;
         }
     } catch (err) {
-        authError.textContent = err.message || "Something went wrong.";
+        const msg = err.message || "Something went wrong.";
+        if (msg.toLowerCase().includes("email not confirmed")) {
+            authError.textContent = "Your email isn't verified yet. Please check your inbox.";
+        } else {
+            authError.textContent = msg;
+        }
         authError.classList.remove("hidden");
     } finally {
         authSubmitBtn.disabled = false;
@@ -273,7 +284,10 @@ async function fetchProfile() {
         .eq("id", currentUser.id)
         .maybeSingle();
 
-    if (error) console.error(error);
+    if (error) {
+        console.error(error);
+        return;
+    }
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
@@ -312,12 +326,17 @@ async function fetchPages() {
 /* ===== NAVBAR ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
+
     CATEGORIES.forEach(cat => {
         const li = document.createElement("li");
         const a = document.createElement("a");
         a.href = "#";
         a.textContent = cat;
-        if (viewMode === "my" && cat === activeCategory) a.classList.add("active");
+
+        if (viewMode === "my" && cat === activeCategory) {
+            a.classList.add("active");
+        }
+
         a.addEventListener("click", (e) => {
             e.preventDefault();
             viewMode = "my";
@@ -326,6 +345,7 @@ function renderNavbar() {
             renderNavbar();
             renderHome();
         });
+
         li.appendChild(a);
         navbar.appendChild(li);
     });
@@ -334,7 +354,11 @@ function renderNavbar() {
     const communityLink = document.createElement("a");
     communityLink.href = "#";
     communityLink.textContent = "Community";
-    if (viewMode === "community") communityLink.classList.add("active");
+
+    if (viewMode === "community") {
+        communityLink.classList.add("active");
+    }
+
     communityLink.addEventListener("click", async (e) => {
         e.preventDefault();
         viewMode = "community";
@@ -342,37 +366,48 @@ function renderNavbar() {
         renderNavbar();
         await enterCommunity();
     });
+
     communityLi.appendChild(communityLink);
     navbar.appendChild(communityLi);
 }
 
-/* ===== HOME ===== */
+/* ===== RENDER HOME ===== */
 function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
+
     content.innerHTML = "";
 
-    const filtered = activeCategory === "All" ? pages : pages.filter(p => p.category === activeCategory);
+    const filtered = activeCategory === "All"
+        ? pages
+        : pages.filter(p => p.category === activeCategory);
+
     const sorted = [...filtered].sort((a, b) => b.updated - a.updated);
 
     if (sorted.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = activeCategory === "All" ? "No pages yet. Click '+ New Page' to get started." : `No pages in "${activeCategory}" yet.`;
+        empty.textContent = activeCategory === "All"
+            ? "No pages yet. Click '+ New Page' to get started."
+            : `No pages in "${activeCategory}" yet.`;
         content.appendChild(empty);
         return;
     }
 
     sorted.forEach(p => {
         const article = document.createElement("article");
+
         const cat = document.createElement("span");
         cat.className = "card-category";
         cat.textContent = p.category;
+
         const h3 = document.createElement("h3");
         h3.textContent = p.title;
+
         const snippet = document.createElement("p");
         snippet.className = "card-snippet";
         snippet.textContent = p.content;
+
         const date = document.createElement("div");
         date.className = "card-date";
         date.textContent = "Updated " + formatDate(p.updated);
@@ -381,7 +416,9 @@ function renderHome() {
         article.appendChild(h3);
         article.appendChild(snippet);
         article.appendChild(date);
+
         article.addEventListener("click", () => openPage(p.id));
+
         content.appendChild(article);
     });
 }
@@ -397,11 +434,13 @@ async function enterCommunity() {
         adminSubnavBtn.classList.add("hidden");
         if (communitySubview === "admin") communitySubview = "feed";
     }
+
     setCommunitySubview(communitySubview);
 }
 
 function setCommunitySubview(view) {
     communitySubview = view;
+
     document.querySelectorAll(".subnav-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.subview === view);
     });
@@ -425,6 +464,7 @@ document.querySelectorAll(".subnav-btn").forEach(btn => {
 /* FEED */
 async function renderFeed() {
     postsList.innerHTML = "";
+
     const loading = document.createElement("div");
     loading.className = "empty-state";
     loading.textContent = "Loading posts...";
@@ -522,7 +562,7 @@ async function renderFeed() {
 
 async function deletePost(postId) {
     const { error } = await sb.from("community_posts").delete().eq("id", postId);
-    if (error) alert("Could not delete post");
+    if (error) alert("Could not delete post: " + error.message);
     else await renderFeed();
 }
 
@@ -539,7 +579,7 @@ cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed
 
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
-    if (!title) return;
+    if (!title) return postTitleInput.focus();
 
     savePostBtn.disabled = true;
     savePostBtn.textContent = "Posting...";
@@ -649,14 +689,16 @@ async function renderMembers() {
     });
 }
 
-/* PROFILE */
+/* PROFILE VIEW */
 async function openProfile(userId) {
     viewingProfileId = userId;
+
     let profile = members.find(m => m.id === userId);
     if (!profile) {
         const { data } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
         profile = data;
     }
+
     if (!profile) return alert("Profile not found.");
 
     profileAvatar.textContent = getInitial(profile.display_name || profile.username);
@@ -667,6 +709,7 @@ async function openProfile(userId) {
 
     if (!profileStatsMap[userId]) await fetchStats();
     const stats = profileStatsMap[userId] || { post_count: 0 };
+
     profileStats.innerHTML = `<div class="profile-stat"><span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span></div>`;
 
     const joinDate = new Date(profile.joined_at);
@@ -723,9 +766,10 @@ saveProfileBtn.addEventListener("click", async () => {
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL (Roles now save permanently) ========== */
+/* ========== ADMIN PANEL - FIXED WITH DEBUG ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
+
     const loading = document.createElement("div");
     loading.className = "empty-state";
     loading.textContent = "Loading members...";
@@ -786,17 +830,25 @@ async function renderAdminPanel() {
 
         roleSelect.addEventListener("change", async () => {
             const newRole = roleSelect.value;
-            const { error } = await sb.from("profiles").update({ role: newRole }).eq("id", member.id);
+            console.log(`[ADMIN] Changing role to ${newRole} for ${member.id}`);
+
+            const { data, error } = await sb
+                .from("profiles")
+                .update({ role: newRole })
+                .eq("id", member.id)
+                .select()
+                .single();
 
             if (error) {
+                console.error("Role update failed:", error);
                 alert("Could not update role: " + error.message);
                 roleSelect.value = member.role;
                 return;
             }
 
+            console.log("✅ Role saved successfully:", data);
             member.role = newRole;
             renderBadges(badges, member);
-            console.log(`✅ Role updated and saved: ${newRole}`);
         });
 
         controls.appendChild(roleSelect);
@@ -819,13 +871,25 @@ async function renderAdminPanel() {
 
         tagSelect.addEventListener("change", async () => {
             if (!tagSelect.value) return;
+
             const newTags = [...(member.extra_tags || []), tagSelect.value];
-            const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
+            console.log(`[ADMIN] Adding tag ${tagSelect.value} →`, newTags);
+
+            const { data, error } = await sb
+                .from("profiles")
+                .update({ extra_tags: newTags })
+                .eq("id", member.id)
+                .select()
+                .single();
+
             if (error) {
+                console.error("Tag update failed:", error);
                 alert("Could not add tag: " + error.message);
                 tagSelect.value = "";
                 return;
             }
+
+            console.log("✅ Tag saved successfully:", data);
             member.extra_tags = newTags;
             renderBadges(badges, member);
             tagSelect.value = "";
@@ -833,18 +897,29 @@ async function renderAdminPanel() {
 
         controls.appendChild(tagSelect);
 
-        // Remove Tag Buttons
+        // Remove buttons
         (member.extra_tags || []).forEach(tag => {
             const removeBtn = document.createElement("button");
             removeBtn.className = "btn btn-sm";
             removeBtn.textContent = "Remove " + tag;
             removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
-                const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
+                console.log(`[ADMIN] Removing tag ${tag} →`, newTags);
+
+                const { data, error } = await sb
+                    .from("profiles")
+                    .update({ extra_tags: newTags })
+                    .eq("id", member.id)
+                    .select()
+                    .single();
+
                 if (error) {
+                    console.error("Remove tag failed:", error);
                     alert("Could not remove tag: " + error.message);
                     return;
                 }
+
+                console.log("✅ Tag removed successfully:", data);
                 member.extra_tags = newTags;
                 renderBadges(badges, member);
             });
