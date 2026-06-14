@@ -108,11 +108,7 @@ const logoutBtn = document.getElementById("logoutBtn");
 /* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString(undefined, {
-        year: "numeric", month: "short", day: "numeric"
-    }) + " " + d.toLocaleTimeString(undefined, {
-        hour: "2-digit", minute: "2-digit"
-    });
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 function showOnly(section) {
@@ -216,7 +212,7 @@ authSubmitBtn.addEventListener("click", async () => {
             });
             if (error) throw error;
             if (data.user && !data.session) {
-                authError.textContent = "Account created! Check your email to confirm.";
+                authError.textContent = "Account created! Check your email.";
                 authError.classList.remove("hidden");
                 setAuthMode("signin");
             }
@@ -233,9 +229,7 @@ authSubmitBtn.addEventListener("click", async () => {
     }
 });
 
-logoutBtn.addEventListener("click", async () => {
-    await sb.auth.signOut();
-});
+logoutBtn.addEventListener("click", async () => await sb.auth.signOut());
 
 sb.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
@@ -270,13 +264,13 @@ async function fetchProfile() {
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
-        const insertRes = await sb.from("profiles").insert({
+        const { data: newData } = await sb.from("profiles").insert({
             id: currentUser.id,
             username: currentUser.email.split("@")[0],
             display_name: getDisplayName(currentUser),
             role: isOwner ? "Owner" : "Member"
         }).select().single();
-        data = insertRes.data;
+        data = newData;
     }
     currentProfile = data;
 }
@@ -294,7 +288,7 @@ async function fetchPages() {
     }));
 }
 
-/* ===== NAVBAR ===== */
+/* ===== NAVBAR & HOME ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
     CATEGORIES.forEach(cat => {
@@ -331,7 +325,6 @@ function renderNavbar() {
     navbar.appendChild(communityLi);
 }
 
-/* ===== HOME ===== */
 function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
@@ -390,9 +383,7 @@ function setCommunitySubview(view) {
     }
 }
 
-document.querySelectorAll(".subnav-btn").forEach(btn => {
-    btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview));
-});
+document.querySelectorAll(".subnav-btn").forEach(btn => btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview)));
 
 /* FEED */
 async function renderFeed() {
@@ -486,9 +477,8 @@ async function renderFeed() {
 }
 
 async function deletePost(postId) {
-    const { error } = await sb.from("community_posts").delete().eq("id", postId);
-    if (error) alert("Could not delete post");
-    else renderFeed();
+    await sb.from("community_posts").delete().eq("id", postId);
+    renderFeed();
 }
 
 /* POST EDITOR */
@@ -497,6 +487,7 @@ newPostBtn.addEventListener("click", () => {
     postCategoryInput.value = "Discussion";
     postContentInput.value = "";
     showCommunitySection(postEditor);
+    postTitleInput.focus();
 });
 
 cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed));
@@ -504,29 +495,41 @@ cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
     if (!title) return;
-    const { error } = await sb.from("community_posts").insert({
-        user_id: currentUser.id,
-        title,
-        category: postCategoryInput.value,
-        content: postContentInput.value.trim()
-    });
-    if (error) alert(error.message);
-    else {
+
+    savePostBtn.disabled = true;
+    savePostBtn.textContent = "Posting...";
+
+    try {
+        const { error } = await sb.from("community_posts").insert({
+            user_id: currentUser.id,
+            title,
+            category: postCategoryInput.value,
+            content: postContentInput.value.trim()
+        });
+        if (error) throw error;
+
         showCommunitySection(communityFeed);
-        renderFeed();
+        await renderFeed();
+    } catch (err) {
+        alert("Could not post: " + (err.message || "unknown error"));
+    } finally {
+        savePostBtn.disabled = false;
+        savePostBtn.textContent = "Post";
     }
 });
 
 /* MEMBERS */
 async function fetchMembers() {
-    const { data } = await sb.from("profiles").select("*").order("joined_at");
+    const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
+    if (error) console.error(error);
     return data || [];
 }
 
 async function fetchStats() {
-    const { data } = await sb.from("profile_stats").select("*");
+    const { data, error } = await sb.from("profile_stats").select("*");
+    if (error) return console.error(error);
     profileStatsMap = {};
-    (data || []).forEach(r => profileStatsMap[r.id] = r);
+    (data || []).forEach(row => profileStatsMap[row.id] = row);
 }
 
 async function renderMembers() {
@@ -604,16 +607,14 @@ async function renderMembers() {
 /* PROFILE */
 async function openProfile(userId) {
     viewingProfileId = userId;
-    let profile = members.find(m => m.id === userId) || 
-        (await sb.from("profiles").select("*").eq("id", userId).maybeSingle()).data;
-
+    let profile = members.find(m => m.id === userId) || (await sb.from("profiles").select("*").eq("id", userId).maybeSingle()).data;
     if (!profile) return alert("Profile not found.");
 
     profileAvatar.textContent = getInitial(profile.display_name || profile.username);
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
     profileUsername.textContent = "@" + (profile.username || "unknown");
     renderBadges(profileBadges, profile);
-    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet." : "No bio yet.");
+    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile." : "No bio yet.");
 
     if (!profileStatsMap[userId]) await fetchStats();
     const stats = profileStatsMap[userId] || { post_count: 0 };
@@ -673,7 +674,7 @@ saveProfileBtn.addEventListener("click", async () => {
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL (FIXED) ========== */
+/* ========== ADMIN PANEL - FIXED PERSISTENCE ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -681,7 +682,7 @@ async function renderAdminPanel() {
     loading.textContent = "Loading members...";
     adminMembersList.appendChild(loading);
 
-    members = await fetchMembers();
+    members = await fetchMembers();  // Always fetch fresh data
     adminMembersList.innerHTML = "";
 
     const isOwner = isOwnerUser(currentProfile);
@@ -817,7 +818,7 @@ async function renderAdminPanel() {
     });
 }
 
-/* ===== PAGE FUNCTIONS ===== */
+/* PAGE FUNCTIONS */
 function openPage(id) {
     const p = pages.find(pg => pg.id === id);
     if (!p) return;
