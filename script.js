@@ -16,13 +16,13 @@ let currentPageId = null;
 let activeCategory = "All";
 let currentUser = null;
 let currentProfile = null;
-let authMode = "signin"; // "signin" | "signup"
-let viewMode = "my"; // "my" | "community"
-let communitySubview = "feed"; // "feed" | "members" | "admin"
+let authMode = "signin";
+let viewMode = "my";
+let communitySubview = "feed";
 
 let posts = [];
 let members = [];
-let profileStatsMap = {}; // id -> { post_count }
+let profileStatsMap = {};
 let viewingProfileId = null;
 
 const OWNER_EMAIL = "removed@example.com";
@@ -141,7 +141,6 @@ function badgeClass(role) {
 
 function renderBadges(container, profile) {
     container.innerHTML = "";
-
     const role = profile.role || "Member";
     const roleBadge = document.createElement("span");
     roleBadge.className = badgeClass(role);
@@ -215,11 +214,9 @@ authSubmitBtn.addEventListener("click", async () => {
                 password,
                 options: { data: { name: name || email.split("@")[0] } }
             });
-
             if (error) throw error;
-
             if (data.user && !data.session) {
-                authError.textContent = "Account created! Check your email to confirm, then sign in.";
+                authError.textContent = "Account created! Check your email to confirm.";
                 authError.classList.remove("hidden");
                 setAuthMode("signin");
             }
@@ -228,12 +225,7 @@ authSubmitBtn.addEventListener("click", async () => {
             if (error) throw error;
         }
     } catch (err) {
-        const msg = err.message || "Something went wrong.";
-        if (msg.toLowerCase().includes("email not confirmed")) {
-            authError.textContent = "Your email isn't verified yet. Please check your inbox.";
-        } else {
-            authError.textContent = msg;
-        }
+        authError.textContent = err.message || "Something went wrong.";
         authError.classList.remove("hidden");
     } finally {
         authSubmitBtn.disabled = false;
@@ -245,14 +237,9 @@ logoutBtn.addEventListener("click", async () => {
     await sb.auth.signOut();
 });
 
-/* ===== AUTH STATE LISTENER ===== */
 sb.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
-    if (currentUser) {
-        showApp();
-    } else {
-        showAuth();
-    }
+    if (currentUser) showApp(); else showAuth();
 });
 
 function showAuth() {
@@ -276,42 +263,26 @@ async function showApp() {
     renderHome();
 }
 
-/* ===== DATA FETCH ===== */
+/* ===== DATA ===== */
 async function fetchProfile() {
-    let { data, error } = await sb
-        .from("profiles")
-        .select("*")
-        .eq("id", currentUser.id)
-        .maybeSingle();
-
-    if (error) {
-        console.error(error);
-        return;
-    }
+    let { data, error } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
+    if (error) console.error(error);
 
     if (!data) {
         const isOwner = currentUser.email === OWNER_EMAIL;
-        const insertRes = await sb
-            .from("profiles")
-            .insert({
-                id: currentUser.id,
-                username: currentUser.email.split("@")[0],
-                display_name: getDisplayName(currentUser),
-                role: isOwner ? "Owner" : "Member"
-            })
-            .select()
-            .single();
+        const insertRes = await sb.from("profiles").insert({
+            id: currentUser.id,
+            username: currentUser.email.split("@")[0],
+            display_name: getDisplayName(currentUser),
+            role: isOwner ? "Owner" : "Member"
+        }).select().single();
         data = insertRes.data;
     }
     currentProfile = data;
 }
 
 async function fetchPages() {
-    const { data, error } = await sb
-        .from("pages")
-        .select("*")
-        .order("updated_at", { ascending: false });
-
+    const { data, error } = await sb.from("pages").select("*").order("updated_at", { ascending: false });
     if (error) console.error(error);
     pages = (data || []).map(row => ({
         id: row.id,
@@ -326,17 +297,12 @@ async function fetchPages() {
 /* ===== NAVBAR ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
-
     CATEGORIES.forEach(cat => {
         const li = document.createElement("li");
         const a = document.createElement("a");
         a.href = "#";
         a.textContent = cat;
-
-        if (viewMode === "my" && cat === activeCategory) {
-            a.classList.add("active");
-        }
-
+        if (viewMode === "my" && cat === activeCategory) a.classList.add("active");
         a.addEventListener("click", (e) => {
             e.preventDefault();
             viewMode = "my";
@@ -345,7 +311,6 @@ function renderNavbar() {
             renderNavbar();
             renderHome();
         });
-
         li.appendChild(a);
         navbar.appendChild(li);
     });
@@ -354,11 +319,7 @@ function renderNavbar() {
     const communityLink = document.createElement("a");
     communityLink.href = "#";
     communityLink.textContent = "Community";
-
-    if (viewMode === "community") {
-        communityLink.classList.add("active");
-    }
-
+    if (viewMode === "community") communityLink.classList.add("active");
     communityLink.addEventListener("click", async (e) => {
         e.preventDefault();
         viewMode = "community";
@@ -366,59 +327,36 @@ function renderNavbar() {
         renderNavbar();
         await enterCommunity();
     });
-
     communityLi.appendChild(communityLink);
     navbar.appendChild(communityLi);
 }
 
-/* ===== RENDER HOME ===== */
+/* ===== HOME ===== */
 function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
-
     content.innerHTML = "";
 
-    const filtered = activeCategory === "All"
-        ? pages
-        : pages.filter(p => p.category === activeCategory);
-
+    const filtered = activeCategory === "All" ? pages : pages.filter(p => p.category === activeCategory);
     const sorted = [...filtered].sort((a, b) => b.updated - a.updated);
 
     if (sorted.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = activeCategory === "All"
-            ? "No pages yet. Click '+ New Page' to get started."
-            : `No pages in "${activeCategory}" yet.`;
+        empty.textContent = activeCategory === "All" ? "No pages yet. Click '+ New Page'." : `No pages in "${activeCategory}" yet.`;
         content.appendChild(empty);
         return;
     }
 
     sorted.forEach(p => {
         const article = document.createElement("article");
+        const cat = document.createElement("span"); cat.className = "card-category"; cat.textContent = p.category;
+        const h3 = document.createElement("h3"); h3.textContent = p.title;
+        const snippet = document.createElement("p"); snippet.className = "card-snippet"; snippet.textContent = p.content;
+        const date = document.createElement("div"); date.className = "card-date"; date.textContent = "Updated " + formatDate(p.updated);
 
-        const cat = document.createElement("span");
-        cat.className = "card-category";
-        cat.textContent = p.category;
-
-        const h3 = document.createElement("h3");
-        h3.textContent = p.title;
-
-        const snippet = document.createElement("p");
-        snippet.className = "card-snippet";
-        snippet.textContent = p.content;
-
-        const date = document.createElement("div");
-        date.className = "card-date";
-        date.textContent = "Updated " + formatDate(p.updated);
-
-        article.appendChild(cat);
-        article.appendChild(h3);
-        article.appendChild(snippet);
-        article.appendChild(date);
-
+        article.append(cat, h3, snippet, date);
         article.addEventListener("click", () => openPage(p.id));
-
         content.appendChild(article);
     });
 }
@@ -428,22 +366,17 @@ async function enterCommunity() {
     showOnly(communityTab);
     hero.classList.add("hidden");
 
-    if (isAdminOrOwner(currentProfile)) {
-        adminSubnavBtn.classList.remove("hidden");
-    } else {
+    if (isAdminOrOwner(currentProfile)) adminSubnavBtn.classList.remove("hidden");
+    else {
         adminSubnavBtn.classList.add("hidden");
         if (communitySubview === "admin") communitySubview = "feed";
     }
-
     setCommunitySubview(communitySubview);
 }
 
 function setCommunitySubview(view) {
     communitySubview = view;
-
-    document.querySelectorAll(".subnav-btn").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.subview === view);
-    });
+    document.querySelectorAll(".subnav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.subview === view));
 
     if (view === "feed") {
         showCommunitySection(communityFeed);
@@ -464,7 +397,6 @@ document.querySelectorAll(".subnav-btn").forEach(btn => {
 /* FEED */
 async function renderFeed() {
     postsList.innerHTML = "";
-
     const loading = document.createElement("div");
     loading.className = "empty-state";
     loading.textContent = "Loading posts...";
@@ -494,7 +426,7 @@ async function renderFeed() {
     if (posts.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "No posts yet. Be the first to share something!";
+        empty.textContent = "No posts yet. Be the first!";
         postsList.appendChild(empty);
         return;
     }
@@ -510,10 +442,7 @@ async function renderFeed() {
         authorLink.className = "post-author-link";
         authorLink.href = "#";
         authorLink.textContent = post.profiles?.display_name || "Unknown";
-        authorLink.addEventListener("click", (e) => {
-            e.preventDefault();
-            openProfile(post.user_id);
-        });
+        authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
         header.appendChild(authorLink);
 
         if (post.profiles) {
@@ -539,13 +468,9 @@ async function renderFeed() {
         date.className = "post-card-date";
         date.textContent = formatDate(new Date(post.created_at).getTime());
 
-        card.appendChild(header);
-        card.appendChild(h3);
-        card.appendChild(contentP);
-        card.appendChild(date);
+        card.append(header, h3, contentP, date);
 
-        const canDelete = post.user_id === currentUser.id || isAdminOrOwner(currentProfile);
-        if (canDelete) {
+        if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
             const actions = document.createElement("div");
             actions.className = "post-card-actions";
             const delBtn = document.createElement("button");
@@ -562,8 +487,8 @@ async function renderFeed() {
 
 async function deletePost(postId) {
     const { error } = await sb.from("community_posts").delete().eq("id", postId);
-    if (error) alert("Could not delete post: " + error.message);
-    else await renderFeed();
+    if (error) alert("Could not delete post");
+    else renderFeed();
 }
 
 /* POST EDITOR */
@@ -572,49 +497,36 @@ newPostBtn.addEventListener("click", () => {
     postCategoryInput.value = "Discussion";
     postContentInput.value = "";
     showCommunitySection(postEditor);
-    postTitleInput.focus();
 });
 
 cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed));
 
 savePostBtn.addEventListener("click", async () => {
     const title = postTitleInput.value.trim();
-    if (!title) return postTitleInput.focus();
-
-    savePostBtn.disabled = true;
-    savePostBtn.textContent = "Posting...";
-
-    try {
-        const { error } = await sb.from("community_posts").insert({
-            user_id: currentUser.id,
-            title,
-            category: postCategoryInput.value,
-            content: postContentInput.value.trim()
-        });
-        if (error) throw error;
-
+    if (!title) return;
+    const { error } = await sb.from("community_posts").insert({
+        user_id: currentUser.id,
+        title,
+        category: postCategoryInput.value,
+        content: postContentInput.value.trim()
+    });
+    if (error) alert(error.message);
+    else {
         showCommunitySection(communityFeed);
-        await renderFeed();
-    } catch (err) {
-        alert("Could not post: " + (err.message || "unknown error"));
-    } finally {
-        savePostBtn.disabled = false;
-        savePostBtn.textContent = "Post";
+        renderFeed();
     }
 });
 
 /* MEMBERS */
 async function fetchMembers() {
-    const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
-    if (error) console.error(error);
+    const { data } = await sb.from("profiles").select("*").order("joined_at");
     return data || [];
 }
 
 async function fetchStats() {
-    const { data, error } = await sb.from("profile_stats").select("*");
-    if (error) return console.error(error);
+    const { data } = await sb.from("profile_stats").select("*");
     profileStatsMap = {};
-    (data || []).forEach(row => profileStatsMap[row.id] = row);
+    (data || []).forEach(r => profileStatsMap[r.id] = r);
 }
 
 async function renderMembers() {
@@ -689,15 +601,11 @@ async function renderMembers() {
     });
 }
 
-/* PROFILE VIEW */
+/* PROFILE */
 async function openProfile(userId) {
     viewingProfileId = userId;
-
-    let profile = members.find(m => m.id === userId);
-    if (!profile) {
-        const { data } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
-        profile = data;
-    }
+    let profile = members.find(m => m.id === userId) || 
+        (await sb.from("profiles").select("*").eq("id", userId).maybeSingle()).data;
 
     if (!profile) return alert("Profile not found.");
 
@@ -705,11 +613,10 @@ async function openProfile(userId) {
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
     profileUsername.textContent = "@" + (profile.username || "unknown");
     renderBadges(profileBadges, profile);
-    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile to add one!" : "No bio yet.");
+    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet." : "No bio yet.");
 
     if (!profileStatsMap[userId]) await fetchStats();
     const stats = profileStatsMap[userId] || { post_count: 0 };
-
     profileStats.innerHTML = `<div class="profile-stat"><span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span></div>`;
 
     const joinDate = new Date(profile.joined_at);
@@ -766,10 +673,9 @@ saveProfileBtn.addEventListener("click", async () => {
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL - FIXED WITH DEBUG ========== */
+/* ========== ADMIN PANEL (FIXED) ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
-
     const loading = document.createElement("div");
     loading.className = "empty-state";
     loading.textContent = "Loading members...";
@@ -830,23 +736,14 @@ async function renderAdminPanel() {
 
         roleSelect.addEventListener("change", async () => {
             const newRole = roleSelect.value;
-            console.log(`[ADMIN] Changing role to ${newRole} for ${member.id}`);
-
-            const { data, error } = await sb
-                .from("profiles")
-                .update({ role: newRole })
-                .eq("id", member.id)
-                .select()
-                .single();
+            const { error } = await sb.from("profiles").update({ role: newRole }).eq("id", member.id);
 
             if (error) {
-                console.error("Role update failed:", error);
                 alert("Could not update role: " + error.message);
                 roleSelect.value = member.role;
                 return;
             }
 
-            console.log("✅ Role saved successfully:", data);
             member.role = newRole;
             renderBadges(badges, member);
         });
@@ -871,25 +768,15 @@ async function renderAdminPanel() {
 
         tagSelect.addEventListener("change", async () => {
             if (!tagSelect.value) return;
-
             const newTags = [...(member.extra_tags || []), tagSelect.value];
-            console.log(`[ADMIN] Adding tag ${tagSelect.value} →`, newTags);
-
-            const { data, error } = await sb
-                .from("profiles")
-                .update({ extra_tags: newTags })
-                .eq("id", member.id)
-                .select()
-                .single();
+            const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
 
             if (error) {
-                console.error("Tag update failed:", error);
                 alert("Could not add tag: " + error.message);
                 tagSelect.value = "";
                 return;
             }
 
-            console.log("✅ Tag saved successfully:", data);
             member.extra_tags = newTags;
             renderBadges(badges, member);
             tagSelect.value = "";
@@ -904,22 +791,13 @@ async function renderAdminPanel() {
             removeBtn.textContent = "Remove " + tag;
             removeBtn.addEventListener("click", async () => {
                 const newTags = (member.extra_tags || []).filter(t => t !== tag);
-                console.log(`[ADMIN] Removing tag ${tag} →`, newTags);
-
-                const { data, error } = await sb
-                    .from("profiles")
-                    .update({ extra_tags: newTags })
-                    .eq("id", member.id)
-                    .select()
-                    .single();
+                const { error } = await sb.from("profiles").update({ extra_tags: newTags }).eq("id", member.id);
 
                 if (error) {
-                    console.error("Remove tag failed:", error);
                     alert("Could not remove tag: " + error.message);
                     return;
                 }
 
-                console.log("✅ Tag removed successfully:", data);
                 member.extra_tags = newTags;
                 renderBadges(badges, member);
             });
@@ -1055,10 +933,7 @@ editBtn.addEventListener("click", () => openEditor(currentPageId));
 deleteBtn.addEventListener("click", deletePage);
 closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); });
 saveBtn.addEventListener("click", savePage);
-cancelBtn.addEventListener("click", () => {
-    if (currentPageId) openPage(currentPageId);
-    else renderHome();
-});
+cancelBtn.addEventListener("click", () => currentPageId ? openPage(currentPageId) : renderHome());
 
 /* ===== INIT ===== */
 setAuthMode("signin");
