@@ -104,21 +104,121 @@
                 <label for="pageContentInput">Content</label>
                 <textarea id="pageContentInput" rows="12" placeholder="Write your thoughts here..."></textarea>
 
-                <label class="checkbox-label">
-                    <input type="checkbox" id="pageSharedInput">
-                    Share this page with the Community
-                </label>
-
                 <div class="editor-actions">
                     <button class="btn btn-primary" id="saveBtn">Save</button>
                     <button class="btn" id="cancelBtn">Cancel</button>
                 </div>
             </section>
 
-            <!-- Community view -->
-            <section class="content hidden" id="communityContent">
-                <!-- Shared pages get rendered here -->
+            <!-- ===================== COMMUNITY TAB ===================== -->
+            <section class="hidden" id="communityTab">
+
+                <!-- Community sub-navigation -->
+                <div class="community-subnav">
+                    <button class="subnav-btn active" data-subview="feed">Feed</button>
+                    <button class="subnav-btn" data-subview="members">Members</button>
+                    <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin">Admin</button>
+                </div>
+
+                <!-- FEED -->
+                <div class="community-section" id="communityFeed">
+                    <div class="feed-new-post">
+                        <button class="btn btn-primary" id="newPostBtn">+ New Post</button>
+                    </div>
+                    <div class="content" id="postsList">
+                        <!-- Posts render here -->
+                    </div>
+                </div>
+
+                <!-- MEMBERS -->
+                <div class="community-section hidden" id="communityMembers">
+                    <div class="content" id="membersList">
+                        <!-- Member cards render here -->
+                    </div>
+                </div>
+
+                <!-- ADMIN PANEL -->
+                <div class="community-section hidden" id="communityAdmin">
+                    <h2 class="section-heading">Admin Panel</h2>
+                    <p class="section-subtext">Manage member roles and badges. Only the Owner can grant or remove Admin status.</p>
+                    <div class="content" id="adminMembersList">
+                        <!-- Admin-editable member cards render here -->
+                    </div>
+                </div>
+
+                <!-- PROFILE VIEW -->
+                <div class="profile-view hidden" id="profileView">
+                    <button class="btn" id="profileBackBtn">← Back</button>
+
+                    <div class="profile-header">
+                        <div class="profile-avatar" id="profileAvatar"></div>
+                        <div class="profile-info">
+                            <h2 id="profileDisplayName"></h2>
+                            <div class="profile-username" id="profileUsername"></div>
+                            <div class="profile-badges" id="profileBadges"></div>
+                        </div>
+                    </div>
+
+                    <div class="profile-bio" id="profileBio"></div>
+
+                    <div class="profile-stats" id="profileStats"></div>
+
+                    <div class="profile-meta" id="profileMeta"></div>
+
+                    <button class="btn btn-primary hidden" id="editProfileBtn">Edit Profile</button>
+                </div>
+
+                <!-- PROFILE EDIT VIEW -->
+                <div class="profile-view hidden" id="profileEditView">
+                    <button class="btn" id="profileEditBackBtn">← Back</button>
+                    <h2 class="section-heading">Edit Profile</h2>
+
+                    <div class="profile-edit-row">
+                        <label for="editDisplayName">Display Name</label>
+                        <input type="text" id="editDisplayName">
+                    </div>
+                    <div class="profile-edit-row">
+                        <label for="editUsername">Username</label>
+                        <input type="text" id="editUsername">
+                    </div>
+                    <div class="profile-edit-row">
+                        <label for="editBio">Bio</label>
+                        <textarea id="editBio" rows="5"></textarea>
+                    </div>
+
+                    <div class="auth-error hidden" id="profileEditError"></div>
+
+                    <div class="editor-actions">
+                        <button class="btn btn-primary" id="saveProfileBtn">Save</button>
+                    </div>
+                </div>
+
+                <!-- POST COMPOSER -->
+                <div class="editor hidden" id="postEditor">
+                    <h2>New Post</h2>
+
+                    <label for="postTitleInput">Title</label>
+                    <input type="text" id="postTitleInput" placeholder="What's this about?">
+
+                    <label for="postCategoryInput">Category</label>
+                    <select id="postCategoryInput">
+                        <option value="Discussion">Discussion</option>
+                        <option value="Announcement">Announcement</option>
+                        <option value="Event">Event</option>
+                        <option value="Idea">Idea</option>
+                    </select>
+
+                    <label for="postContentInput">Content</label>
+                    <textarea id="postContentInput" rows="8" placeholder="Share something with the community..."></textarea>
+
+                    <div class="editor-actions">
+                        <button class="btn btn-primary" id="savePostBtn">Post</button>
+                        <button class="btn" id="cancelPostBtn">Cancel</button>
+                    </div>
+                </div>
+
             </section>
+            <!-- =================== END COMMUNITY TAB =================== -->
 
         </div>
 
