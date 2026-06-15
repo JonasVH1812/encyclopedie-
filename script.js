@@ -29,7 +29,18 @@ let viewingProfileId = null;
 const OWNER_EMAIL = "removed@example.com";
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
 const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
-const TAG_OPTIONS = ["VIP", "Contributor", "Moderator", "Co-Owner","Prof zager","nummer 1 mama","chernobly tester","Langste niet ai post owner","grappige spast","prof website breker"];
+const TAG_OPTIONS = [
+    "Co-Owner",
+    "VIP",
+    "Contributor",
+    "Moderator",
+    "Prof zager",
+    "nummer 1 mama",
+    "chernobly tester",
+    "Langste niet ai post owner",
+    "grappige spast",
+    "prof website breker"
+];
 
 /* ===== ELEMENTS ===== */
 const pageTitle      = document.getElementById("pageTitle");
@@ -1088,7 +1099,7 @@ function renderAdminCard(member, isOwner) {
     avatar.textContent = getInitial(member.display_name || member.username);
 
     const nameWrap = document.createElement("div");
-    const name     = document.createElement("div");
+    const name = document.createElement("div");
     name.className = "member-card-name";
     name.textContent = member.display_name || member.username || "Unknown";
 
@@ -1115,11 +1126,10 @@ function renderAdminCard(member, isOwner) {
         setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
     }
 
-    // Role select
+    // ── Role select (unchanged) ──────────────────────────────
     const roleSelect = document.createElement("select");
     const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
-    const rolesToShow    = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
-
+    const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
     rolesToShow.forEach(role => {
         const opt = document.createElement("option");
         opt.value = role;
@@ -1127,42 +1137,187 @@ function renderAdminCard(member, isOwner) {
         if (role === member.role) opt.selected = true;
         roleSelect.appendChild(opt);
     });
-
     const canChangeRole = isOwner && member.id !== currentUser.id;
     if (!canChangeRole) roleSelect.disabled = true;
 
     roleSelect.addEventListener("change", async () => {
-        const newRole    = roleSelect.value;
-        const prevRole   = member.role;
+        const newRole = roleSelect.value;
+        const prevRole = member.role;
         roleSelect.disabled = true;
-
         const { data: saved, error } = await sb
             .from("profiles")
             .update({ role: newRole })
             .eq("id", member.id)
             .select("role, extra_tags")
             .single();
-
         roleSelect.disabled = false;
-
         if (error) {
-            console.error("Role save error:", error);
             showStatus("❌ " + (error.message || "Save failed"), false);
             roleSelect.value = prevRole;
             return;
         }
-
-        member.role       = saved.role;
+        member.role = saved.role;
         member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
         renderBadges(badges, member);
         showStatus("✓ Role saved");
-
         if (member.id === currentUser.id) {
             currentProfile.role = member.role;
             updateAccountUI();
         }
     });
+    controls.appendChild(roleSelect);
 
+    // ── Tag add select (unchanged) ───────────────────────────
+    const tagSelect = document.createElement("select");
+    const blankOpt = document.createElement("option");
+    blankOpt.value = "";
+    blankOpt.textContent = "+ Add tag";
+    tagSelect.appendChild(blankOpt);
+
+    function rebuildTagSelect() {
+        while (tagSelect.options.length > 1) tagSelect.remove(1);
+        TAG_OPTIONS.forEach(tag => {
+            if (!(member.extra_tags || []).includes(tag)) {
+                const opt = document.createElement("option");
+                opt.value = tag;
+                opt.textContent = tag;
+                tagSelect.appendChild(opt);
+            }
+        });
+    }
+    rebuildTagSelect();
+
+    tagSelect.addEventListener("change", async () => {
+        const tag = tagSelect.value;
+        if (!tag) return;
+        const newTags = [...(member.extra_tags || []), tag];
+        tagSelect.disabled = true;
+        const { data: saved, error } = await sb
+            .from("profiles")
+            .update({ extra_tags: newTags })
+            .eq("id", member.id)
+            .select("role, extra_tags")
+            .single();
+        tagSelect.disabled = false;
+        tagSelect.value = "";
+        if (error) {
+            showStatus("❌ " + (error.message || "Save failed"), false);
+            return;
+        }
+        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
+        renderBadges(badges, member);
+        rebuildTagSelect();
+        rebuildTagList();   // rebuild the list of tags with reorder buttons
+        showStatus("✓ Tag added");
+    });
+    controls.appendChild(tagSelect);
+
+    // ── Tag list with reorder buttons (NEW) ──────────────────
+    const tagListContainer = document.createElement("div");
+    tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
+
+    function rebuildTagList() {
+        tagListContainer.innerHTML = "";
+        const tags = member.extra_tags || [];
+        if (tags.length === 0) {
+            const emptyMsg = document.createElement("div");
+            emptyMsg.textContent = "No custom badges";
+            emptyMsg.style.cssText = "color:#64748b; font-size:0.75rem;";
+            tagListContainer.appendChild(emptyMsg);
+            return;
+        }
+        tags.forEach((tag, idx) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;gap:8px;";
+
+            const upBtn = document.createElement("button");
+            upBtn.textContent = "▲";
+            upBtn.className = "btn btn-sm";
+            upBtn.style.padding = "2px 6px";
+            upBtn.disabled = idx === 0;
+            upBtn.addEventListener("click", async () => {
+                if (idx === 0) return;
+                const newTags = [...tags];
+                [newTags[idx - 1], newTags[idx]] = [newTags[idx], newTags[idx - 1]];
+                await saveTagOrder(newTags);
+            });
+
+            const downBtn = document.createElement("button");
+            downBtn.textContent = "▼";
+            downBtn.className = "btn btn-sm";
+            downBtn.style.padding = "2px 6px";
+            downBtn.disabled = idx === tags.length - 1;
+            downBtn.addEventListener("click", async () => {
+                if (idx === tags.length - 1) return;
+                const newTags = [...tags];
+                [newTags[idx], newTags[idx + 1]] = [newTags[idx + 1], newTags[idx]];
+                await saveTagOrder(newTags);
+            });
+
+            const tagSpan = document.createElement("span");
+            tagSpan.textContent = tag;
+            tagSpan.className = "badge badge-custom";
+            tagSpan.style.backgroundColor = "rgba(129,140,248,.1)";
+            tagSpan.style.color = "#818cf8";
+            tagSpan.style.padding = "2px 8px";
+
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "✕";
+            removeBtn.className = "btn btn-danger btn-sm";
+            removeBtn.style.padding = "2px 6px";
+            removeBtn.addEventListener("click", async () => {
+                const newTags = tags.filter(t => t !== tag);
+                await saveTagOrder(newTags);
+            });
+
+            row.append(upBtn, downBtn, tagSpan, removeBtn);
+            tagListContainer.appendChild(row);
+        });
+    }
+
+    async function saveTagOrder(newTags) {
+        // Optimistically update UI and local state
+        member.extra_tags = newTags;
+        renderBadges(badges, member);
+        rebuildTagList();
+        rebuildTagSelect();
+        // Save to database
+        const { error } = await sb
+            .from("profiles")
+            .update({ extra_tags: newTags })
+            .eq("id", member.id);
+        if (error) {
+            console.error("Tag reorder error:", error);
+            showStatus("❌ Failed to save order", false);
+            // Revert by re-fetching member
+            const { data: fresh } = await sb.from("profiles").select("*").eq("id", member.id).single();
+            if (fresh) {
+                member.extra_tags = Array.isArray(fresh.extra_tags) ? fresh.extra_tags : [];
+                renderBadges(badges, member);
+                rebuildTagList();
+                rebuildTagSelect();
+            }
+        } else {
+            showStatus("✓ Order saved");
+        }
+    }
+
+    rebuildTagList();
+    controls.appendChild(tagListContainer);
+    controls.appendChild(statusLabel);
+
+    // View profile button
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn btn-sm";
+    viewBtn.textContent = "View Profile";
+    viewBtn.addEventListener("click", () => openProfile(member.id));
+    controls.appendChild(viewBtn);
+
+    header.appendChild(identity);
+    header.appendChild(controls);
+    card.appendChild(header);
+    adminMembersList.appendChild(card);
+}
     controls.appendChild(roleSelect);
 
     // Tag add select
