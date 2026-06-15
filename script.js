@@ -28,7 +28,7 @@ let viewingProfileId = null;
 const OWNER_EMAIL = "removed@example.com";
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
 const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
-const TAG_OPTIONS = ["VIP", "Contributor", "Moderator", "Co-Owner","Prof zager","nummer 1 mama","chernobly tester","Langste niet ai post owner"];
+const TAG_OPTIONS = ["VIP", "Contributor", "Moderator", "Co-Owner","Prof zager","nummer 1 mama","chernobly tester","Langste niet ai post owner","grappige spast"];
 
 /* ===== ELEMENTS ===== */
 const pageTitle      = document.getElementById("pageTitle");
