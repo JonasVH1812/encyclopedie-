@@ -1466,3 +1466,13 @@ footer {
         padding-left: 0;
     }
 }
+.tag-grappige-spast {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: rgba(255, 105, 180, 0.15);
+    color: #ff69b4;
+    border: 1px solid rgba(255, 105, 180, 0.4);
+}
