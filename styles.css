@@ -137,11 +137,11 @@ nav { flex: 1; overflow: hidden; }
 }
 
 /* Community link gets a subtle highlight */
-.navbar li:last-child a {
+.navbar li:first-child a {
     color: #60a5fa;
 }
-.navbar li:last-child a:hover,
-.navbar li:last-child a.active {
+.navbar li:first-child a:hover,
+.navbar li:first-child a.active {
     color: #fbbf24;
     background: rgba(251,191,36,.1);
 }

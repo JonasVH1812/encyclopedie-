@@ -46,18 +46,34 @@
 
                     <div class="account-dropdown-divider"></div>
 
-                    <button class="account-dropdown-item" id="dropdownProfileBtn">
-                        <span class="dropdown-icon">👤</span> My Profile
-                    </button>
-                    <button class="account-dropdown-item" id="dropdownNewPageBtn">
-                        <span class="dropdown-icon">📄</span> New Page
-                    </button>
+                    <!-- Main menu -->
+                    <div id="accountMainMenu">
+                        <button class="account-dropdown-item" id="dropdownProfileBtn">
+                            <span class="dropdown-icon">👤</span> My Profile
+                        </button>
+                        <button class="account-dropdown-item" id="dropdownNewPageBtn">
+                            <span class="dropdown-icon">📄</span> New Page
+                        </button>
 
-                    <div class="account-dropdown-divider"></div>
+                        <div class="account-dropdown-divider"></div>
 
-                    <button class="account-dropdown-item danger" id="dropdownLogoutBtn">
-                        <span class="dropdown-icon">→</span> Sign out
-                    </button>
+                        <button class="account-dropdown-item" id="dropdownSettingsBtn">
+                            <span class="dropdown-icon">⚙️</span> Settings
+                        </button>
+                    </div>
+
+                    <!-- Settings sub-menu -->
+                    <div class="hidden" id="accountSettingsMenu">
+                        <button class="account-dropdown-item" id="dropdownSettingsBackBtn">
+                            <span class="dropdown-icon">←</span> Back
+                        </button>
+
+                        <div class="account-dropdown-divider"></div>
+
+                        <button class="account-dropdown-item danger" id="dropdownLogoutBtn">
+                            <span class="dropdown-icon">→</span> Sign out
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -279,14 +295,28 @@
     <script>
     // Account dropdown wiring (no changes to script.js needed)
     document.addEventListener('DOMContentLoaded', () => {
+        const accountWrap      = document.getElementById('accountWrap');
         const accountBtn       = document.getElementById('accountBtn');
         const accountDropdown  = document.getElementById('accountDropdown');
         const dropdownOverlay  = document.getElementById('dropdownOverlay');
         const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
         const dropdownNewPageBtn = document.getElementById('dropdownNewPageBtn');
         const dropdownProfileBtn = document.getElementById('dropdownProfileBtn');
+        const dropdownSettingsBtn = document.getElementById('dropdownSettingsBtn');
+        const dropdownSettingsBackBtn = document.getElementById('dropdownSettingsBackBtn');
+        const accountMainMenu  = document.getElementById('accountMainMenu');
+        const accountSettingsMenu = document.getElementById('accountSettingsMenu');
         const logoutBtn        = document.getElementById('logoutBtn');
         const newPageBtn       = document.getElementById('newPageBtn');
+
+        function showMainMenu() {
+            accountSettingsMenu.classList.add('hidden');
+            accountMainMenu.classList.remove('hidden');
+        }
+        function showSettingsMenu() {
+            accountMainMenu.classList.add('hidden');
+            accountSettingsMenu.classList.remove('hidden');
+        }
 
         function openDropdown() {
             accountDropdown.classList.remove('hidden');
@@ -297,6 +327,7 @@
             accountDropdown.classList.add('hidden');
             dropdownOverlay.classList.add('hidden');
             accountBtn.setAttribute('aria-expanded', 'false');
+            showMainMenu();
         }
 
         accountBtn.addEventListener('click', (e) => {
@@ -304,7 +335,15 @@
             accountDropdown.classList.contains('hidden') ? openDropdown() : closeDropdown();
         });
 
+        // Open on hover too
+        accountWrap.addEventListener('mouseenter', openDropdown);
+        accountWrap.addEventListener('mouseleave', closeDropdown);
+
         dropdownOverlay.addEventListener('click', closeDropdown);
+
+        // Settings submenu
+        dropdownSettingsBtn.addEventListener('click', showSettingsMenu);
+        dropdownSettingsBackBtn.addEventListener('click', showMainMenu);
 
         // Mirror the existing logout button
         dropdownLogoutBtn.addEventListener('click', () => {

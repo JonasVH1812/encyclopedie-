@@ -255,8 +255,9 @@ async function showApp() {
 
     await fetchProfile();
     await fetchPages();
+    viewMode = "community";
     renderNavbar();
-    renderHome();
+    await enterCommunity();
 }
 
 /* ===== DATA ===== */
@@ -297,6 +298,23 @@ async function fetchPages() {
 /* ===== NAVBAR & HOME ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
+
+    const communityLi   = document.createElement("li");
+    const communityLink = document.createElement("a");
+    communityLink.href = "#";
+    communityLink.textContent = "Community";
+    communityLink.setAttribute("data-community", "true");
+    if (viewMode === "community") communityLink.classList.add("active");
+    communityLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        viewMode = "community";
+        currentPageId = null;
+        renderNavbar();
+        await enterCommunity();
+    });
+    communityLi.appendChild(communityLink);
+    navbar.appendChild(communityLi);
+
     CATEGORIES.forEach(cat => {
         const li = document.createElement("li");
         const a  = document.createElement("a");
@@ -314,21 +332,6 @@ function renderNavbar() {
         li.appendChild(a);
         navbar.appendChild(li);
     });
-
-    const communityLi   = document.createElement("li");
-    const communityLink = document.createElement("a");
-    communityLink.href = "#";
-    communityLink.textContent = "Community";
-    if (viewMode === "community") communityLink.classList.add("active");
-    communityLink.addEventListener("click", async (e) => {
-        e.preventDefault();
-        viewMode = "community";
-        currentPageId = null;
-        renderNavbar();
-        await enterCommunity();
-    });
-    communityLi.appendChild(communityLink);
-    navbar.appendChild(communityLi);
 }
 
 function renderHome() {
@@ -481,7 +484,33 @@ function buildPostCard(post, container) {
         const delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger btn-sm";
         delBtn.textContent = "Delete post";
-        delBtn.addEventListener("click", () => deletePost(post.id));
+        delBtn.addEventListener("click", () => {
+            let confirmBar = card.querySelector(".delete-confirm");
+            if (confirmBar) return confirmBar.remove();
+
+            confirmBar = document.createElement("div");
+            confirmBar.className = "delete-confirm";
+
+            const text = document.createElement("span");
+            text.textContent = `Delete "${post.title}"? This cannot be undone.`;
+
+            const yesBtn = document.createElement("button");
+            yesBtn.className = "btn btn-danger";
+            yesBtn.textContent = "Yes, delete";
+            yesBtn.addEventListener("click", async () => {
+                yesBtn.disabled = true;
+                yesBtn.textContent = "Deleting...";
+                await deletePost(post.id);
+            });
+
+            const noBtn = document.createElement("button");
+            noBtn.className = "btn";
+            noBtn.textContent = "Cancel";
+            noBtn.addEventListener("click", () => confirmBar.remove());
+
+            confirmBar.append(text, yesBtn, noBtn);
+            actions.appendChild(confirmBar);
+        });
         actions.appendChild(delBtn);
         card.appendChild(actions);
     }
@@ -626,10 +655,33 @@ async function loadComments(postId, listEl) {
             delBtn.textContent = "✕";
             delBtn.title = "Delete comment";
             delBtn.addEventListener("click", async () => {
-                delBtn.disabled = true;
-                const { error } = await sb.from("post_comments").delete().eq("id", comment.id);
-                if (error) { alert(error.message); delBtn.disabled = false; return; }
-                await loadComments(postId, listEl);
+                let confirmBar = el.querySelector(".delete-confirm");
+                if (confirmBar) return confirmBar.remove();
+
+                confirmBar = document.createElement("div");
+                confirmBar.className = "delete-confirm";
+
+                const text = document.createElement("span");
+                text.textContent = "Delete this comment?";
+
+                const yesBtn = document.createElement("button");
+                yesBtn.className = "btn btn-danger btn-sm";
+                yesBtn.textContent = "Yes, delete";
+                yesBtn.addEventListener("click", async () => {
+                    yesBtn.disabled = true;
+                    yesBtn.textContent = "Deleting...";
+                    const { error } = await sb.from("post_comments").delete().eq("id", comment.id);
+                    if (error) { alert(error.message); yesBtn.disabled = false; yesBtn.textContent = "Yes, delete"; return; }
+                    await loadComments(postId, listEl);
+                });
+
+                const noBtn = document.createElement("button");
+                noBtn.className = "btn btn-sm";
+                noBtn.textContent = "Cancel";
+                noBtn.addEventListener("click", () => confirmBar.remove());
+
+                confirmBar.append(text, yesBtn, noBtn);
+                el.appendChild(confirmBar);
             });
             commentHeader.appendChild(delBtn);
         }
