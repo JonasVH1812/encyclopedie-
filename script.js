@@ -431,57 +431,210 @@ async function renderFeed() {
         return;
     }
 
-    posts.forEach(post => {
-        const card   = document.createElement("div");
-        card.className = "post-card";
+    posts.forEach(post => buildPostCard(post, postsList));
+}
 
-        const header = document.createElement("div");
-        header.className = "post-card-header";
+function buildPostCard(post, container) {
+    const card = document.createElement("div");
+    card.className = "post-card";
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement("div");
+    header.className = "post-card-header";
+
+    const authorLink = document.createElement("a");
+    authorLink.className = "post-author-link";
+    authorLink.href = "#";
+    authorLink.textContent = post.profiles?.display_name || "Unknown";
+    authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
+    header.appendChild(authorLink);
+
+    if (post.profiles) {
+        const badgeWrap = document.createElement("span");
+        badgeWrap.className = "member-badges";
+        renderBadges(badgeWrap, post.profiles);
+        header.appendChild(badgeWrap);
+    }
+
+    const catSpan = document.createElement("span");
+    catSpan.className = "post-card-category";
+    catSpan.textContent = post.category;
+    header.appendChild(catSpan);
+
+    const h3 = document.createElement("h3");
+    h3.textContent = post.title;
+
+    const contentP = document.createElement("p");
+    contentP.className = "post-card-content";
+    contentP.textContent = post.content;
+
+    const date = document.createElement("div");
+    date.className = "post-card-date";
+    date.textContent = formatDate(new Date(post.created_at).getTime());
+
+    card.append(header, h3, contentP, date);
+
+    // ── Post actions (delete) ─────────────────────────────────
+    if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
+        const actions = document.createElement("div");
+        actions.className = "post-card-actions";
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-danger btn-sm";
+        delBtn.textContent = "Delete post";
+        delBtn.addEventListener("click", () => deletePost(post.id));
+        actions.appendChild(delBtn);
+        card.appendChild(actions);
+    }
+
+    // ── Comments section ──────────────────────────────────────
+    const commentsSection = document.createElement("div");
+    commentsSection.className = "comments-section";
+
+    // Toggle button
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "comments-toggle-btn";
+    toggleBtn.textContent = "💬 Show comments";
+    let commentsLoaded = false;
+    let commentsOpen   = false;
+
+    const commentsList = document.createElement("div");
+    commentsList.className = "comments-list hidden";
+
+    // Comment composer
+    const composer = document.createElement("div");
+    composer.className = "comment-composer";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "comment-textarea";
+    textarea.placeholder = "Write a comment...";
+    textarea.rows = 2;
+
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "btn btn-primary btn-sm";
+    submitBtn.textContent = "Post comment";
+
+    submitBtn.addEventListener("click", async () => {
+        const text = textarea.value.trim();
+        if (!text) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Posting...";
+
+        const { error } = await sb.from("post_comments").insert({
+            post_id:  post.id,
+            user_id:  currentUser.id,
+            content:  text
+        });
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Post comment";
+
+        if (error) {
+            alert("Could not post comment: " + error.message);
+            return;
+        }
+
+        textarea.value = "";
+        await loadComments(post.id, commentsList);
+    });
+
+    composer.append(textarea, submitBtn);
+
+    // Load / toggle
+    toggleBtn.addEventListener("click", async () => {
+        commentsOpen = !commentsOpen;
+        if (commentsOpen) {
+            commentsList.classList.remove("hidden");
+            composer.classList.remove("hidden");
+            if (!commentsLoaded) {
+                await loadComments(post.id, commentsList);
+                commentsLoaded = true;
+            }
+            toggleBtn.textContent = "💬 Hide comments";
+        } else {
+            commentsList.classList.add("hidden");
+            composer.classList.add("hidden");
+            toggleBtn.textContent = "💬 Show comments";
+        }
+    });
+
+    composer.classList.add("hidden");
+    commentsSection.append(toggleBtn, commentsList, composer);
+    card.appendChild(commentsSection);
+    container.appendChild(card);
+}
+
+async function loadComments(postId, listEl) {
+    listEl.innerHTML = `<div class="comment-loading">Loading...</div>`;
+
+    const { data, error } = await sb
+        .from("post_comments")
+        .select(`*, profiles!post_comments_user_id_fkey(display_name, username, role, extra_tags)`)
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+
+    listEl.innerHTML = "";
+
+    if (error) {
+        listEl.innerHTML = `<div class="comment-loading">Could not load comments.</div>`;
+        console.error(error);
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        listEl.innerHTML = `<div class="comment-loading">No comments yet. Be the first!</div>`;
+        return;
+    }
+
+    data.forEach(comment => {
+        const el = document.createElement("div");
+        el.className = "comment";
+
+        const commentHeader = document.createElement("div");
+        commentHeader.className = "comment-header";
+
+        const avatar = document.createElement("div");
+        avatar.className = "comment-avatar";
+        avatar.textContent = getInitial(comment.profiles?.display_name || comment.profiles?.username);
 
         const authorLink = document.createElement("a");
         authorLink.className = "post-author-link";
         authorLink.href = "#";
-        authorLink.textContent = post.profiles?.display_name || "Unknown";
-        authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
-        header.appendChild(authorLink);
+        authorLink.textContent = comment.profiles?.display_name || "Unknown";
+        authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(comment.user_id); });
 
-        if (post.profiles) {
-            const badgeWrap = document.createElement("span");
-            badgeWrap.className = "member-badges";
-            renderBadges(badgeWrap, post.profiles);
-            header.appendChild(badgeWrap);
-        }
+        const badges = document.createElement("span");
+        badges.className = "member-badges";
+        if (comment.profiles) renderBadges(badges, comment.profiles);
 
-        const catSpan = document.createElement("span");
-        catSpan.className = "post-card-category";
-        catSpan.textContent = post.category;
-        header.appendChild(catSpan);
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "comment-date";
+        dateSpan.textContent = formatDate(new Date(comment.created_at).getTime());
 
-        const h3 = document.createElement("h3");
-        h3.textContent = post.title;
+        commentHeader.append(avatar, authorLink, badges, dateSpan);
 
-        const contentP = document.createElement("p");
-        contentP.className = "post-card-content";
-        contentP.textContent = post.content;
+        const body = document.createElement("div");
+        body.className = "comment-body";
+        body.textContent = comment.content;
 
-        const date = document.createElement("div");
-        date.className = "post-card-date";
-        date.textContent = formatDate(new Date(post.created_at).getTime());
+        el.append(commentHeader, body);
 
-        card.append(header, h3, contentP, date);
-
-        if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
-            const actions = document.createElement("div");
-            actions.className = "post-card-actions";
+        // Delete button for own comments or admins/owner
+        if (comment.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
             const delBtn = document.createElement("button");
-            delBtn.className = "btn btn-danger btn-sm";
-            delBtn.textContent = "Delete";
-            delBtn.addEventListener("click", () => deletePost(post.id));
-            actions.appendChild(delBtn);
-            card.appendChild(actions);
+            delBtn.className = "btn btn-danger btn-sm comment-delete-btn";
+            delBtn.textContent = "✕";
+            delBtn.title = "Delete comment";
+            delBtn.addEventListener("click", async () => {
+                delBtn.disabled = true;
+                const { error } = await sb.from("post_comments").delete().eq("id", comment.id);
+                if (error) { alert(error.message); delBtn.disabled = false; return; }
+                await loadComments(postId, listEl);
+            });
+            commentHeader.appendChild(delBtn);
         }
 
-        postsList.appendChild(card);
+        listEl.appendChild(el);
     });
 }
 
