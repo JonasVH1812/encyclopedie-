@@ -9,7 +9,7 @@ const SUPABASE_URL = "https://yxtcyfxupfhlgfknhfke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_QNNFueMNFT6fnpEhXNdzDg__s-xQm5M";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-window.sb = sb; // make available for settings dropdown
+window.sb = sb;
 
 /* ===== STATE ===== */
 let pages = [];
@@ -225,64 +225,48 @@ function closeDropdown() {
     showMainMenu();
 }
 
-// Setup account dropdown listeners (called after login)
-function setupAccountDropdown() {
-    const accountBtn = document.getElementById("accountBtn");
-    const accountWrapEl = document.getElementById("accountWrap");
+function toggleDropdown(e) {
+    e.stopPropagation();
     const dropdown = document.getElementById("accountDropdown");
-    if (!accountBtn || !accountWrapEl || !dropdown) return;
-
-    let closeTimeout = null;
-
-    function cancelClose() {
-        if (closeTimeout) {
-            clearTimeout(closeTimeout);
-            closeTimeout = null;
-        }
-    }
-
-    function scheduleClose() {
-        cancelClose();
-        closeTimeout = setTimeout(() => {
-            closeDropdown();
-        }, 200);
-    }
-
-    function openWithCancel() {
-        cancelClose();
+    if (dropdown && !dropdown.classList.contains("hidden")) {
+        closeDropdown();
+    } else {
         openDropdown();
     }
+}
 
-    accountWrapEl.addEventListener("mouseenter", openWithCancel);
-    accountWrapEl.addEventListener("mouseleave", scheduleClose);
-    dropdown.addEventListener("mouseenter", openWithCancel);
-    dropdown.addEventListener("mouseleave", scheduleClose);
-
-    if (dropdownOverlay) dropdownOverlay.addEventListener("click", () => {
-        cancelClose();
+function closeDropdownOnOutsideClick(e) {
+    const accountBtn = document.getElementById("accountBtn");
+    const dropdown = document.getElementById("accountDropdown");
+    if (!dropdown || dropdown.classList.contains("hidden")) return;
+    if (!dropdown.contains(e.target) && !accountBtn.contains(e.target)) {
         closeDropdown();
-    });
+    }
+}
 
-    // Existing listeners for settings etc.
+function setupAccountDropdown() {
+    const accountBtn = document.getElementById("accountBtn");
+    if (!accountBtn) return;
+
+    accountBtn.addEventListener("click", toggleDropdown);
+    document.addEventListener("click", closeDropdownOnOutsideClick);
+
     if (dropdownSettingsBtn) dropdownSettingsBtn.addEventListener("click", showSettingsMenu);
     if (dropdownSettingsBackBtn) dropdownSettingsBackBtn.addEventListener("click", showMainMenu);
     if (dropdownLogoutBtn) {
         dropdownLogoutBtn.addEventListener("click", () => {
-            cancelClose();
             closeDropdown();
             logoutBtn.click();
         });
     }
     if (dropdownNewPageBtn) {
         dropdownNewPageBtn.addEventListener("click", () => {
-            cancelClose();
             closeDropdown();
             newPageBtn.click();
         });
     }
     if (dropdownProfileBtn) {
         dropdownProfileBtn.addEventListener("click", () => {
-            cancelClose();
             closeDropdown();
             const communityLink = document.querySelector('.navbar a[data-community]') ||
                 [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
@@ -296,7 +280,41 @@ function setupAccountDropdown() {
     }
     if (settingsSaveBtn) {
         settingsSaveBtn.addEventListener("click", async () => {
-            // ... existing save logic ...
+            const displayName = settingsDisplayName.value.trim();
+            const username = settingsUsername.value.trim();
+            const bio = settingsBio.value.trim();
+            if (!displayName || !username) {
+                if (settingsError) {
+                    settingsError.textContent = "Display name and username are required.";
+                    settingsError.classList.remove("hidden");
+                }
+                return;
+            }
+            settingsSaveBtn.disabled = true;
+            settingsSaveBtn.textContent = "Saving...";
+            const { error } = await sb.from("profiles").update({
+                display_name: displayName,
+                username,
+                bio,
+                updated_at: new Date().toISOString()
+            }).eq("id", currentUser.id);
+            settingsSaveBtn.disabled = false;
+            settingsSaveBtn.textContent = "Save Changes";
+            if (error) {
+                if (settingsError) {
+                    settingsError.textContent = error.message;
+                    settingsError.classList.remove("hidden");
+                }
+                return;
+            }
+            await fetchProfile();
+            updateAccountUI();
+            if (viewMode === 'my' && renderHome) renderHome();
+            pageTitle.textContent = `Encyclopedie van ${currentProfile.display_name || currentProfile.username}`;
+            welcomeHeading.textContent = `Welcome, ${currentProfile.display_name || currentProfile.username}`;
+            if (settingsError) settingsError.classList.add("hidden");
+            settingsSaveBtn.textContent = "✓ Saved!";
+            setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
         });
     }
 }
@@ -589,7 +607,7 @@ function buildPostCard(post, container) {
     const card = document.createElement("div");
     card.className = "post-card";
 
-    // ── Header ────────────────────────────────────────────────
+    // Header
     const header = document.createElement("div");
     header.className = "post-card-header";
 
@@ -625,7 +643,7 @@ function buildPostCard(post, container) {
 
     card.append(header, h3, contentP, date);
 
-    // ── Post actions (delete) ─────────────────────────────────
+    // Delete action
     if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
         const actions = document.createElement("div");
         actions.className = "post-card-actions";
@@ -663,11 +681,10 @@ function buildPostCard(post, container) {
         card.appendChild(actions);
     }
 
-    // ── Comments section ──────────────────────────────────────
+    // Comments section
     const commentsSection = document.createElement("div");
     commentsSection.className = "comments-section";
 
-    // Toggle button
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "comments-toggle-btn";
     toggleBtn.textContent = "💬 Show comments";
@@ -677,7 +694,6 @@ function buildPostCard(post, container) {
     const commentsList = document.createElement("div");
     commentsList.className = "comments-list hidden";
 
-    // Comment composer
     const composer = document.createElement("div");
     composer.className = "comment-composer";
 
@@ -717,7 +733,6 @@ function buildPostCard(post, container) {
 
     composer.append(textarea, submitBtn);
 
-    // Load / toggle
     toggleBtn.addEventListener("click", async () => {
         commentsOpen = !commentsOpen;
         if (commentsOpen) {
@@ -796,7 +811,6 @@ async function loadComments(postId, listEl) {
 
         el.append(commentHeader, body);
 
-        // Delete button for own comments or admins/owner
         if (comment.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
             const delBtn = document.createElement("button");
             delBtn.className = "btn btn-danger btn-sm comment-delete-btn";
@@ -1063,7 +1077,7 @@ function renderAdminCard(member, isOwner) {
     card.className = "admin-member-card";
     card.dataset.memberId = member.id;
 
-    const header   = document.createElement("div");
+    const header = document.createElement("div");
     header.className = "admin-member-header";
 
     const identity = document.createElement("div");
