@@ -1126,7 +1126,7 @@ function renderAdminCard(member, isOwner) {
         setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
     }
 
-    // ── Role select (unchanged) ──────────────────────────────
+    // Role select
     const roleSelect = document.createElement("select");
     const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
     const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
@@ -1167,7 +1167,7 @@ function renderAdminCard(member, isOwner) {
     });
     controls.appendChild(roleSelect);
 
-    // ── Tag add select (unchanged) ───────────────────────────
+    // Tag add select
     const tagSelect = document.createElement("select");
     const blankOpt = document.createElement("option");
     blankOpt.value = "";
@@ -1207,12 +1207,12 @@ function renderAdminCard(member, isOwner) {
         member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
         renderBadges(badges, member);
         rebuildTagSelect();
-        rebuildTagList();   // rebuild the list of tags with reorder buttons
+        rebuildTagList();
         showStatus("✓ Tag added");
     });
     controls.appendChild(tagSelect);
 
-    // ── Tag list with reorder buttons (NEW) ──────────────────
+    // Tag list with reorder buttons
     const tagListContainer = document.createElement("div");
     tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
 
@@ -1276,12 +1276,10 @@ function renderAdminCard(member, isOwner) {
     }
 
     async function saveTagOrder(newTags) {
-        // Optimistically update UI and local state
         member.extra_tags = newTags;
         renderBadges(badges, member);
         rebuildTagList();
         rebuildTagSelect();
-        // Save to database
         const { error } = await sb
             .from("profiles")
             .update({ extra_tags: newTags })
@@ -1289,7 +1287,6 @@ function renderAdminCard(member, isOwner) {
         if (error) {
             console.error("Tag reorder error:", error);
             showStatus("❌ Failed to save order", false);
-            // Revert by re-fetching member
             const { data: fresh } = await sb.from("profiles").select("*").eq("id", member.id).single();
             if (fresh) {
                 member.extra_tags = Array.isArray(fresh.extra_tags) ? fresh.extra_tags : [];
@@ -1307,114 +1304,6 @@ function renderAdminCard(member, isOwner) {
     controls.appendChild(statusLabel);
 
     // View profile button
-    const viewBtn = document.createElement("button");
-    viewBtn.className = "btn btn-sm";
-    viewBtn.textContent = "View Profile";
-    viewBtn.addEventListener("click", () => openProfile(member.id));
-    controls.appendChild(viewBtn);
-
-    header.appendChild(identity);
-    header.appendChild(controls);
-    card.appendChild(header);
-    adminMembersList.appendChild(card);
-}
-    controls.appendChild(roleSelect);
-
-    // Tag add select
-    const tagSelect  = document.createElement("select");
-    const blankOpt   = document.createElement("option");
-    blankOpt.value   = "";
-    blankOpt.textContent = "+ Add tag";
-    tagSelect.appendChild(blankOpt);
-
-    function rebuildTagSelect() {
-        while (tagSelect.options.length > 1) tagSelect.remove(1);
-        TAG_OPTIONS.forEach(tag => {
-            if (!(member.extra_tags || []).includes(tag)) {
-                const opt = document.createElement("option");
-                opt.value = tag;
-                opt.textContent = tag;
-                tagSelect.appendChild(opt);
-            }
-        });
-    }
-
-    rebuildTagSelect();
-
-    tagSelect.addEventListener("change", async () => {
-        const tag = tagSelect.value;
-        if (!tag) return;
-
-        const newTags = [...(member.extra_tags || []), tag];
-        tagSelect.disabled = true;
-
-        const { data: saved, error } = await sb
-            .from("profiles")
-            .update({ extra_tags: newTags })
-            .eq("id", member.id)
-            .select("role, extra_tags")
-            .single();
-
-        tagSelect.disabled = false;
-        tagSelect.value    = "";
-
-        if (error) {
-            console.error("Tag add error:", error);
-            showStatus("❌ " + (error.message || "Save failed"), false);
-            return;
-        }
-
-        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
-        renderBadges(badges, member);
-        rebuildTagSelect();
-        rebuildRemoveButtons();
-        showStatus("✓ Tag saved");
-    });
-
-    controls.appendChild(tagSelect);
-
-    // Remove-tag buttons
-    const removeWrap = document.createElement("div");
-    removeWrap.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
-
-    function rebuildRemoveButtons() {
-        removeWrap.innerHTML = "";
-        (member.extra_tags || []).forEach(tag => {
-            const removeBtn = document.createElement("button");
-            removeBtn.className = "btn btn-sm btn-danger";
-            removeBtn.textContent = "✕ " + tag;
-            removeBtn.addEventListener("click", async () => {
-                const newTags = (member.extra_tags || []).filter(t => t !== tag);
-                removeBtn.disabled = true;
-
-                const { data: saved, error } = await sb
-                    .from("profiles")
-                    .update({ extra_tags: newTags })
-                    .eq("id", member.id)
-                    .select("role, extra_tags")
-                    .single();
-
-                if (error) {
-                    console.error("Tag remove error:", error);
-                    showStatus("❌ " + (error.message || "Save failed"), false);
-                    removeBtn.disabled = false;
-                    return;
-                }
-
-                member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
-                renderBadges(badges, member);
-                rebuildTagSelect();
-                rebuildRemoveButtons();
-                showStatus("✓ Tag removed");
-            });
-            removeWrap.appendChild(removeBtn);
-        });
-    }
-
-    rebuildRemoveButtons();
-    controls.appendChild(removeWrap);
-    controls.appendChild(statusLabel);
-
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn btn-sm";
     viewBtn.textContent = "View Profile";
