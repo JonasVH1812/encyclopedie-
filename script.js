@@ -9,6 +9,7 @@ const SUPABASE_URL = "https://yxtcyfxupfhlgfknhfke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_QNNFueMNFT6fnpEhXNdzDg__s-xQm5M";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.sb = sb; // make available for settings dropdown
 
 /* ===== STATE ===== */
 let pages = [];
@@ -105,6 +106,26 @@ const saveBtn    = document.getElementById("saveBtn");
 const cancelBtn  = document.getElementById("cancelBtn");
 const logoutBtn  = document.getElementById("logoutBtn");
 
+// Account dropdown elements
+const accountWrap        = document.getElementById("accountWrap");
+const accountAvatar      = document.getElementById("accountAvatar");
+const accountDropdownAvatar = document.getElementById("accountDropdownAvatar");
+const accountDropdownName   = document.getElementById("accountDropdownName");
+const accountDropdownRole   = document.getElementById("accountDropdownRole");
+const settingsDisplayName   = document.getElementById("settingsDisplayName");
+const settingsUsername      = document.getElementById("settingsUsername");
+const settingsBio           = document.getElementById("settingsBio");
+const settingsSaveBtn       = document.getElementById("settingsSaveBtn");
+const settingsError         = document.getElementById("settingsError");
+const dropdownLogoutBtn     = document.getElementById("dropdownLogoutBtn");
+const dropdownNewPageBtn    = document.getElementById("dropdownNewPageBtn");
+const dropdownProfileBtn    = document.getElementById("dropdownProfileBtn");
+const dropdownSettingsBtn   = document.getElementById("dropdownSettingsBtn");
+const dropdownSettingsBackBtn = document.getElementById("dropdownSettingsBackBtn");
+const accountMainMenu       = document.getElementById("accountMainMenu");
+const accountSettingsMenu   = document.getElementById("accountSettingsMenu");
+const dropdownOverlay       = document.getElementById("dropdownOverlay");
+
 /* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
@@ -159,6 +180,134 @@ function isAdminOrOwner(profile) {
 
 function isOwnerUser(profile) {
     return profile && profile.role === "Owner";
+}
+
+/* ===== ACCOUNT DROPDOWN UI ===== */
+function updateAccountUI() {
+    if (!currentProfile) return;
+    const initial = getInitial(currentProfile.display_name || currentProfile.username);
+    if (accountAvatar) accountAvatar.textContent = initial;
+    if (accountDropdownAvatar) accountDropdownAvatar.textContent = initial;
+    if (accountDropdownName) accountDropdownName.textContent = currentProfile.display_name || currentProfile.username;
+    if (accountDropdownRole) accountDropdownRole.textContent = currentProfile.role || "Member";
+}
+
+function showMainMenu() {
+    if (accountSettingsMenu) accountSettingsMenu.classList.add("hidden");
+    if (accountMainMenu) accountMainMenu.classList.remove("hidden");
+}
+
+function showSettingsMenu() {
+    if (currentProfile) {
+        if (settingsDisplayName) settingsDisplayName.value = currentProfile.display_name || "";
+        if (settingsUsername) settingsUsername.value = currentProfile.username || "";
+        if (settingsBio) settingsBio.value = currentProfile.bio || "";
+    }
+    if (accountMainMenu) accountMainMenu.classList.add("hidden");
+    if (accountSettingsMenu) accountSettingsMenu.classList.remove("hidden");
+    if (settingsError) settingsError.classList.add("hidden");
+}
+
+function openDropdown() {
+    const dropdown = document.getElementById("accountDropdown");
+    if (dropdown) dropdown.classList.remove("hidden");
+    if (dropdownOverlay) dropdownOverlay.classList.remove("hidden");
+    const btn = document.getElementById("accountBtn");
+    if (btn) btn.setAttribute("aria-expanded", "true");
+}
+
+function closeDropdown() {
+    const dropdown = document.getElementById("accountDropdown");
+    if (dropdown) dropdown.classList.add("hidden");
+    if (dropdownOverlay) dropdownOverlay.classList.add("hidden");
+    const btn = document.getElementById("accountBtn");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    showMainMenu();
+}
+
+// Setup account dropdown listeners (called after login)
+function setupAccountDropdown() {
+    const accountBtn = document.getElementById("accountBtn");
+    const accountWrapEl = document.getElementById("accountWrap");
+    if (!accountBtn || !accountWrapEl) return;
+
+    accountBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const dropdown = document.getElementById("accountDropdown");
+        if (dropdown?.classList.contains("hidden")) openDropdown();
+        else closeDropdown();
+    });
+
+    accountWrapEl.addEventListener("mouseenter", openDropdown);
+    accountWrapEl.addEventListener("mouseleave", closeDropdown);
+    if (dropdownOverlay) dropdownOverlay.addEventListener("click", closeDropdown);
+    if (dropdownSettingsBtn) dropdownSettingsBtn.addEventListener("click", showSettingsMenu);
+    if (dropdownSettingsBackBtn) dropdownSettingsBackBtn.addEventListener("click", showMainMenu);
+
+    if (dropdownLogoutBtn) {
+        dropdownLogoutBtn.addEventListener("click", () => {
+            closeDropdown();
+            logoutBtn.click();
+        });
+    }
+    if (dropdownNewPageBtn) {
+        dropdownNewPageBtn.addEventListener("click", () => {
+            closeDropdown();
+            newPageBtn.click();
+        });
+    }
+    if (dropdownProfileBtn) {
+        dropdownProfileBtn.addEventListener("click", () => {
+            closeDropdown();
+            const communityLink = document.querySelector('.navbar a[data-community]') ||
+                [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
+            if (communityLink) communityLink.click();
+            setTimeout(() => {
+                if (typeof openProfile === 'function' && currentUser) {
+                    openProfile(currentUser.id);
+                }
+            }, 300);
+        });
+    }
+    if (settingsSaveBtn) {
+        settingsSaveBtn.addEventListener("click", async () => {
+            const displayName = settingsDisplayName.value.trim();
+            const username = settingsUsername.value.trim();
+            const bio = settingsBio.value.trim();
+            if (!displayName || !username) {
+                if (settingsError) {
+                    settingsError.textContent = "Display name and username are required.";
+                    settingsError.classList.remove("hidden");
+                }
+                return;
+            }
+            settingsSaveBtn.disabled = true;
+            settingsSaveBtn.textContent = "Saving...";
+            const { error } = await sb.from("profiles").update({
+                display_name: displayName,
+                username,
+                bio,
+                updated_at: new Date().toISOString()
+            }).eq("id", currentUser.id);
+            settingsSaveBtn.disabled = false;
+            settingsSaveBtn.textContent = "Save Changes";
+            if (error) {
+                if (settingsError) {
+                    settingsError.textContent = error.message;
+                    settingsError.classList.remove("hidden");
+                }
+                return;
+            }
+            await fetchProfile();
+            updateAccountUI();
+            if (viewMode === 'my' && renderHome) renderHome();
+            pageTitle.textContent = `Encyclopedie van ${currentProfile.display_name || currentProfile.username}`;
+            welcomeHeading.textContent = `Welcome, ${currentProfile.display_name || currentProfile.username}`;
+            if (settingsError) settingsError.classList.add("hidden");
+            settingsSaveBtn.textContent = "✓ Saved!";
+            setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
+        });
+    }
 }
 
 /* ===== AUTH UI ===== */
@@ -243,6 +392,7 @@ function showAuth() {
     appContent.classList.add("hidden");
     pageTitle.textContent = "Encyclopedie";
     navbar.innerHTML = "";
+    if (accountWrap) accountWrap.classList.add("hidden");
 }
 
 async function showApp() {
@@ -254,6 +404,10 @@ async function showApp() {
     welcomeHeading.textContent = `Welcome, ${name}`;
 
     await fetchProfile();
+    updateAccountUI();
+    if (accountWrap) accountWrap.classList.remove("hidden");
+    setupAccountDropdown();
+
     await fetchPages();
     viewMode = "community";
     renderNavbar();
@@ -277,9 +431,10 @@ async function fetchProfile() {
         if (insertErr) console.error("fetchProfile insert error:", insertErr);
         data = newData;
     }
-    // Normalise: ensure extra_tags is always an array
     if (data && !Array.isArray(data.extra_tags)) data.extra_tags = [];
     currentProfile = data;
+    window.currentProfile = currentProfile;
+    return data;
 }
 
 async function fetchPages() {
@@ -295,42 +450,44 @@ async function fetchPages() {
     }));
 }
 
-/* ===== NAVBAR & HOME ===== */
+/* ===== NAVBAR & HOME (All first, then Community, then categories) ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
 
-    const communityLi   = document.createElement("li");
-    const communityLink = document.createElement("a");
-    communityLink.href = "#";
-    communityLink.textContent = "Community";
-    communityLink.setAttribute("data-community", "true");
-    if (viewMode === "community") communityLink.classList.add("active");
-    communityLink.addEventListener("click", async (e) => {
-        e.preventDefault();
-        viewMode = "community";
-        currentPageId = null;
-        renderNavbar();
-        await enterCommunity();
-    });
-    communityLi.appendChild(communityLink);
-    navbar.appendChild(communityLi);
-
-    CATEGORIES.forEach(cat => {
+    const addLink = (text, isCommunity = false, cat = null) => {
         const li = document.createElement("li");
-        const a  = document.createElement("a");
+        const a = document.createElement("a");
         a.href = "#";
-        a.textContent = cat;
+        a.textContent = text;
+        if (isCommunity) a.setAttribute("data-community", "true");
         if (viewMode === "my" && cat === activeCategory) a.classList.add("active");
-        a.addEventListener("click", (e) => {
+        if (viewMode === "community" && isCommunity) a.classList.add("active");
+        a.addEventListener("click", async (e) => {
             e.preventDefault();
-            viewMode = "my";
-            activeCategory = cat;
-            currentPageId = null;
-            renderNavbar();
-            renderHome();
+            if (isCommunity) {
+                viewMode = "community";
+                currentPageId = null;
+                renderNavbar();
+                await enterCommunity();
+            } else {
+                viewMode = "my";
+                activeCategory = cat;
+                currentPageId = null;
+                renderNavbar();
+                renderHome();
+            }
         });
         li.appendChild(a);
         navbar.appendChild(li);
+    };
+
+    // 1. "All" category
+    addLink("All", false, "All");
+    // 2. "Community"
+    addLink("Community", true);
+    // 3. The rest of the categories (skip "All")
+    CATEGORIES.forEach(cat => {
+        if (cat !== "All") addLink(cat, false, cat);
     });
 }
 
@@ -736,7 +893,6 @@ savePostBtn.addEventListener("click", async () => {
 async function fetchMembers() {
     const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
     if (error) console.error(error);
-    // Normalise extra_tags for every member
     return (data || []).map(m => ({ ...m, extra_tags: Array.isArray(m.extra_tags) ? m.extra_tags : [] }));
 }
 
@@ -823,12 +979,10 @@ async function renderMembers() {
 async function openProfile(userId) {
     viewingProfileId = userId;
 
-    // Always fetch fresh from DB so roles/tags are up to date
     const { data: profile, error } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
     if (error || !profile) { alert("Profile not found."); return; }
     if (!Array.isArray(profile.extra_tags)) profile.extra_tags = [];
 
-    // Update local cache
     const idx = members.findIndex(m => m.id === userId);
     if (idx !== -1) members[idx] = profile;
 
@@ -893,6 +1047,7 @@ saveProfileBtn.addEventListener("click", async () => {
     currentProfile.display_name = displayName;
     currentProfile.username     = username;
     currentProfile.bio          = bio;
+    updateAccountUI();
     await openProfile(currentUser.id);
 });
 
@@ -904,7 +1059,6 @@ async function renderAdminPanel() {
     loading.textContent = "Loading members...";
     adminMembersList.appendChild(loading);
 
-    // Always fetch fresh server data — this is the single source of truth
     members = await fetchMembers();
     adminMembersList.innerHTML = "";
 
@@ -913,16 +1067,11 @@ async function renderAdminPanel() {
     members.forEach(member => renderAdminCard(member, isOwner));
 }
 
-/**
- * Renders one admin card. Extracted so we can re-render a single card in-place
- * after a successful save, without a full panel reload.
- */
 function renderAdminCard(member, isOwner) {
     const card = document.createElement("div");
     card.className = "admin-member-card";
     card.dataset.memberId = member.id;
 
-    // ── Identity ──────────────────────────────────────────────────────────
     const header   = document.createElement("div");
     header.className = "admin-member-header";
 
@@ -947,11 +1096,9 @@ function renderAdminCard(member, isOwner) {
     identity.appendChild(avatar);
     identity.appendChild(nameWrap);
 
-    // ── Controls ──────────────────────────────────────────────────────────
     const controls = document.createElement("div");
     controls.className = "admin-role-controls";
 
-    // Status label (shows save result)
     const statusLabel = document.createElement("span");
     statusLabel.className = "admin-save-status";
     statusLabel.style.cssText = "font-size:.8rem;color:#4ade80;display:none;";
@@ -963,10 +1110,8 @@ function renderAdminCard(member, isOwner) {
         setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
     }
 
-    // ── Role select ───────────────────────────────────────────────────────
+    // Role select
     const roleSelect = document.createElement("select");
-
-    // Which roles can this admin assign?
     const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
     const rolesToShow    = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
 
@@ -978,7 +1123,6 @@ function renderAdminCard(member, isOwner) {
         roleSelect.appendChild(opt);
     });
 
-    // Disable if not allowed to change
     const canChangeRole = isOwner && member.id !== currentUser.id;
     if (!canChangeRole) roleSelect.disabled = true;
 
@@ -999,25 +1143,24 @@ function renderAdminCard(member, isOwner) {
         if (error) {
             console.error("Role save error:", error);
             showStatus("❌ " + (error.message || "Save failed"), false);
-            roleSelect.value = prevRole;   // revert UI
+            roleSelect.value = prevRole;
             return;
         }
 
-        // Update local member object from what the DB actually stored
         member.role       = saved.role;
         member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
         renderBadges(badges, member);
         showStatus("✓ Role saved");
 
-        // If this is the current user's own card, refresh currentProfile
         if (member.id === currentUser.id) {
             currentProfile.role = member.role;
+            updateAccountUI();
         }
     });
 
     controls.appendChild(roleSelect);
 
-    // ── Tag add select ────────────────────────────────────────────────────
+    // Tag add select
     const tagSelect  = document.createElement("select");
     const blankOpt   = document.createElement("option");
     blankOpt.value   = "";
@@ -1025,7 +1168,6 @@ function renderAdminCard(member, isOwner) {
     tagSelect.appendChild(blankOpt);
 
     function rebuildTagSelect() {
-        // Remove all options except the blank one
         while (tagSelect.options.length > 1) tagSelect.remove(1);
         TAG_OPTIONS.forEach(tag => {
             if (!(member.extra_tags || []).includes(tag)) {
@@ -1062,7 +1204,6 @@ function renderAdminCard(member, isOwner) {
             return;
         }
 
-        // Confirm from DB what was actually stored
         member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
         renderBadges(badges, member);
         rebuildTagSelect();
@@ -1072,7 +1213,7 @@ function renderAdminCard(member, isOwner) {
 
     controls.appendChild(tagSelect);
 
-    // ── Remove-tag buttons ────────────────────────────────────────────────
+    // Remove-tag buttons
     const removeWrap = document.createElement("div");
     removeWrap.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
 
@@ -1114,7 +1255,6 @@ function renderAdminCard(member, isOwner) {
     controls.appendChild(removeWrap);
     controls.appendChild(statusLabel);
 
-    // ── View profile btn ──────────────────────────────────────────────────
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn btn-sm";
     viewBtn.textContent = "View Profile";
