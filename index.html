@@ -62,11 +62,29 @@
                         </button>
                     </div>
 
-                    <!-- Settings sub-menu -->
+                    <!-- Settings sub-menu with inline profile editing -->
                     <div class="hidden" id="accountSettingsMenu">
                         <button class="account-dropdown-item" id="dropdownSettingsBackBtn">
                             <span class="dropdown-icon">←</span> Back
                         </button>
+                        <div class="account-dropdown-divider"></div>
+
+                        <div class="settings-form" style="padding: 6px 8px;">
+                            <div class="settings-field" style="margin-bottom: 10px;">
+                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Display Name</label>
+                                <input type="text" id="settingsDisplayName" class="settings-input" placeholder="Display Name" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
+                            </div>
+                            <div class="settings-field" style="margin-bottom: 10px;">
+                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Username</label>
+                                <input type="text" id="settingsUsername" class="settings-input" placeholder="Username" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
+                            </div>
+                            <div class="settings-field" style="margin-bottom: 10px;">
+                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Bio</label>
+                                <textarea id="settingsBio" rows="3" placeholder="Tell something about yourself..." style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0; font-family:inherit; resize:vertical;"></textarea>
+                            </div>
+                            <div class="settings-error hidden" id="settingsError" style="color:#f87171; font-size:0.75rem; margin-bottom:8px;"></div>
+                            <button class="btn btn-primary btn-sm" id="settingsSaveBtn" style="width:100%; margin-bottom:10px;">Save Changes</button>
+                        </div>
 
                         <div class="account-dropdown-divider"></div>
 
@@ -293,7 +311,7 @@
     <div class="dropdown-overlay hidden" id="dropdownOverlay"></div>
 
     <script>
-    // Account dropdown wiring (no changes to script.js needed)
+    // Additional dropdown wiring - main logic inside script.js, but we need to sync settings form
     document.addEventListener('DOMContentLoaded', () => {
         const accountWrap      = document.getElementById('accountWrap');
         const accountBtn       = document.getElementById('accountBtn');
@@ -308,14 +326,28 @@
         const accountSettingsMenu = document.getElementById('accountSettingsMenu');
         const logoutBtn        = document.getElementById('logoutBtn');
         const newPageBtn       = document.getElementById('newPageBtn');
+        
+        // Settings form elements
+        const settingsDisplayName = document.getElementById('settingsDisplayName');
+        const settingsUsername = document.getElementById('settingsUsername');
+        const settingsBio = document.getElementById('settingsBio');
+        const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+        const settingsError = document.getElementById('settingsError');
 
         function showMainMenu() {
             accountSettingsMenu.classList.add('hidden');
             accountMainMenu.classList.remove('hidden');
         }
         function showSettingsMenu() {
+            // Fill settings form with current profile data before showing
+            if (window.currentProfile) {
+                settingsDisplayName.value = window.currentProfile.display_name || '';
+                settingsUsername.value = window.currentProfile.username || '';
+                settingsBio.value = window.currentProfile.bio || '';
+            }
             accountMainMenu.classList.add('hidden');
             accountSettingsMenu.classList.remove('hidden');
+            settingsError.classList.add('hidden');
         }
 
         function openDropdown() {
@@ -335,46 +367,94 @@
             accountDropdown.classList.contains('hidden') ? openDropdown() : closeDropdown();
         });
 
-        // Open on hover too
         accountWrap.addEventListener('mouseenter', openDropdown);
         accountWrap.addEventListener('mouseleave', closeDropdown);
-
         dropdownOverlay.addEventListener('click', closeDropdown);
 
-        // Settings submenu
         dropdownSettingsBtn.addEventListener('click', showSettingsMenu);
         dropdownSettingsBackBtn.addEventListener('click', showMainMenu);
 
-        // Mirror the existing logout button
+        // Settings save handler
+        settingsSaveBtn.addEventListener('click', async () => {
+            const displayName = settingsDisplayName.value.trim();
+            const username = settingsUsername.value.trim();
+            const bio = settingsBio.value.trim();
+            if (!displayName || !username) {
+                settingsError.textContent = "Display name and username are required.";
+                settingsError.classList.remove('hidden');
+                return;
+            }
+            settingsSaveBtn.disabled = true;
+            settingsSaveBtn.textContent = "Saving...";
+            const { error } = await window.sb
+                .from("profiles")
+                .update({
+                    display_name: displayName,
+                    username: username,
+                    bio: bio,
+                    updated_at: new Date().toISOString()
+                })
+                .eq("id", window.currentUser.id);
+            settingsSaveBtn.disabled = false;
+            settingsSaveBtn.textContent = "Save Changes";
+            if (error) {
+                settingsError.textContent = error.message;
+                settingsError.classList.remove('hidden');
+                return;
+            }
+            // Refresh profile globally
+            if (window.fetchProfile) await window.fetchProfile();
+            // Update dropdown UI
+            if (window.currentProfile) {
+                const avatarDiv = document.getElementById('accountDropdownAvatar');
+                const nameSpan = document.getElementById('accountDropdownName');
+                const roleSpan = document.getElementById('accountDropdownRole');
+                const topAvatar = document.getElementById('accountAvatar');
+                if (avatarDiv) avatarDiv.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
+                if (nameSpan) nameSpan.textContent = window.currentProfile.display_name || window.currentProfile.username;
+                if (roleSpan) roleSpan.textContent = window.currentProfile.role || "Member";
+                if (topAvatar) topAvatar.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
+                // Also update page title and welcome heading if in my pages view
+                if (window.viewMode === 'my' && window.renderHome) window.renderHome();
+                const pageTitleEl = document.getElementById('pageTitle');
+                if (pageTitleEl && window.currentUser) {
+                    const name = window.currentProfile?.display_name || window.currentUser.email?.split('@')[0] || '';
+                    pageTitleEl.textContent = `Encyclopedie van ${name}`;
+                }
+                const welcomeHeading = document.getElementById('welcomeHeading');
+                if (welcomeHeading && window.currentProfile) {
+                    welcomeHeading.textContent = `Welcome, ${window.currentProfile.display_name || window.currentProfile.username}`;
+                }
+            }
+            settingsError.classList.add('hidden');
+            // Optionally show success briefly
+            const originalText = settingsSaveBtn.textContent;
+            settingsSaveBtn.textContent = "✓ Saved!";
+            setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
+        });
+
         dropdownLogoutBtn.addEventListener('click', () => {
             closeDropdown();
             logoutBtn.click();
         });
 
-        // Mirror new page button
         dropdownNewPageBtn.addEventListener('click', () => {
             closeDropdown();
             newPageBtn.click();
         });
 
-        // Open own profile in community
         dropdownProfileBtn.addEventListener('click', () => {
             closeDropdown();
-            // Navigate to community first, then open profile
             const communityLink = document.querySelector('.navbar a[data-community]') ||
                 [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
             if (communityLink) communityLink.click();
-            // openProfile is called from script.js after community is entered
             setTimeout(() => {
-                if (typeof openProfile === 'function' && window.currentUser) {
-                    openProfile(window.currentUser.id);
+                if (typeof window.openProfile === 'function' && window.currentUser) {
+                    window.openProfile(window.currentUser.id);
                 }
             }, 300);
         });
     });
-
-    // Keep account avatar in sync with app state
-    const _origShowApp = window.showApp;
     </script>
 
 </body>
