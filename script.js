@@ -1,4 +1,4 @@
-/* ==== SPOTLIGHT EFFECT ==== */
+/* ===== SPOTLIGHT EFFECT ===== */
 document.addEventListener("mousemove", (e) => {
     document.body.style.setProperty("--x", e.clientX + "px");
     document.body.style.setProperty("--y", e.clientY + "px");
@@ -501,11 +501,8 @@ function renderNavbar() {
         navbar.appendChild(li);
     };
 
-    // 1. "All" category
     addLink("All", false, "All");
-    // 2. "Community"
     addLink("Community", true);
-    // 3. The rest of the categories (skip "All")
     CATEGORIES.forEach(cat => {
         if (cat !== "All") addLink(cat, false, cat);
     });
@@ -618,7 +615,6 @@ function buildPostCard(post, container) {
     const card = document.createElement("div");
     card.className = "post-card";
 
-    // Header
     const header = document.createElement("div");
     header.className = "post-card-header";
 
@@ -654,7 +650,6 @@ function buildPostCard(post, container) {
 
     card.append(header, h3, contentP, date);
 
-    // Delete action
     if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
         const actions = document.createElement("div");
         actions.className = "post-card-actions";
@@ -692,7 +687,6 @@ function buildPostCard(post, container) {
         card.appendChild(actions);
     }
 
-    // Comments section
     const commentsSection = document.createElement("div");
     commentsSection.className = "comments-section";
 
@@ -1126,7 +1120,7 @@ function renderAdminCard(member, isOwner) {
         setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
     }
 
-    // Role select
+    // Role select - only Owner can change roles
     const roleSelect = document.createElement("select");
     const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
     const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
@@ -1167,12 +1161,16 @@ function renderAdminCard(member, isOwner) {
     });
     controls.appendChild(roleSelect);
 
-    // Tag add select
+    // Tag add select - Admins can add tags to Members only
     const tagSelect = document.createElement("select");
     const blankOpt = document.createElement("option");
     blankOpt.value = "";
     blankOpt.textContent = "+ Add tag";
     tagSelect.appendChild(blankOpt);
+
+    // Check if current user can modify tags for this member
+    const canModifyTags = isOwner || (isAdminOrOwner(currentProfile) && member.role === "Member");
+    if (!canModifyTags) tagSelect.disabled = true;
 
     function rebuildTagSelect() {
         while (tagSelect.options.length > 1) tagSelect.remove(1);
@@ -1212,7 +1210,7 @@ function renderAdminCard(member, isOwner) {
     });
     controls.appendChild(tagSelect);
 
-    // Tag list with reorder buttons
+    // Tag list with reorder buttons - Admins can reorder tags for Members
     const tagListContainer = document.createElement("div");
     tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
 
@@ -1234,9 +1232,9 @@ function renderAdminCard(member, isOwner) {
             upBtn.textContent = "▲";
             upBtn.className = "btn btn-sm";
             upBtn.style.padding = "2px 6px";
-            upBtn.disabled = idx === 0;
+            upBtn.disabled = idx === 0 || !canModifyTags;
             upBtn.addEventListener("click", async () => {
-                if (idx === 0) return;
+                if (idx === 0 || !canModifyTags) return;
                 const newTags = [...tags];
                 [newTags[idx - 1], newTags[idx]] = [newTags[idx], newTags[idx - 1]];
                 await saveTagOrder(newTags);
@@ -1246,9 +1244,9 @@ function renderAdminCard(member, isOwner) {
             downBtn.textContent = "▼";
             downBtn.className = "btn btn-sm";
             downBtn.style.padding = "2px 6px";
-            downBtn.disabled = idx === tags.length - 1;
+            downBtn.disabled = idx === tags.length - 1 || !canModifyTags;
             downBtn.addEventListener("click", async () => {
-                if (idx === tags.length - 1) return;
+                if (idx === tags.length - 1 || !canModifyTags) return;
                 const newTags = [...tags];
                 [newTags[idx], newTags[idx + 1]] = [newTags[idx + 1], newTags[idx]];
                 await saveTagOrder(newTags);
@@ -1265,7 +1263,9 @@ function renderAdminCard(member, isOwner) {
             removeBtn.textContent = "✕";
             removeBtn.className = "btn btn-danger btn-sm";
             removeBtn.style.padding = "2px 6px";
+            removeBtn.disabled = !canModifyTags;
             removeBtn.addEventListener("click", async () => {
+                if (!canModifyTags) return;
                 const newTags = tags.filter(t => t !== tag);
                 await saveTagOrder(newTags);
             });
