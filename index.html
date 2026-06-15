@@ -13,449 +13,246 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="script.js"></script>
 </head>
-
 <body>
 
-    <div class="stars"></div>
+<div class="stars"></div>
 
-    <!-- ===== HEADER ===== -->
-    <header>
-        <div class="header-inner">
-            <h1 class="titel" id="pageTitle">Encyclopedie</h1>
-
-            <nav>
-                <ul class="navbar" id="navbar">
-                    <!-- Pages get rendered here -->
-                </ul>
-            </nav>
-
-            <!-- Account icon (top-right, shown when logged in) -->
-            <div class="account-wrap hidden" id="accountWrap">
-                <button class="account-btn" id="accountBtn" aria-label="Account menu" aria-expanded="false">
-                    <div class="account-avatar" id="accountAvatar">?</div>
-                </button>
-
-                <div class="account-dropdown hidden" id="accountDropdown">
-                    <div class="account-dropdown-header">
-                        <div class="account-dropdown-avatar" id="accountDropdownAvatar">?</div>
-                        <div>
-                            <div class="account-dropdown-name" id="accountDropdownName">—</div>
-                            <div class="account-dropdown-role" id="accountDropdownRole">Member</div>
-                        </div>
+<header>
+    <div class="header-inner">
+        <h1 class="titel" id="pageTitle">Encyclopedie</h1>
+        <nav>
+            <ul class="navbar" id="navbar"></ul>
+        </nav>
+        <div class="account-wrap hidden" id="accountWrap">
+            <button class="account-btn" id="accountBtn" aria-label="Account menu" aria-expanded="false">
+                <div class="account-avatar" id="accountAvatar">?</div>
+            </button>
+            <div class="account-dropdown hidden" id="accountDropdown">
+                <div class="account-dropdown-header">
+                    <div class="account-dropdown-avatar" id="accountDropdownAvatar">?</div>
+                    <div>
+                        <div class="account-dropdown-name" id="accountDropdownName">—</div>
+                        <div class="account-dropdown-role" id="accountDropdownRole">Member</div>
                     </div>
-
+                </div>
+                <div class="account-dropdown-divider"></div>
+                <div id="accountMainMenu">
+                    <button class="account-dropdown-item" id="dropdownProfileBtn"><span class="dropdown-icon">👤</span> My Profile</button>
+                    <button class="account-dropdown-item" id="dropdownNewPageBtn"><span class="dropdown-icon">📄</span> New Page</button>
                     <div class="account-dropdown-divider"></div>
-
-                    <!-- Main menu -->
-                    <div id="accountMainMenu">
-                        <button class="account-dropdown-item" id="dropdownProfileBtn">
-                            <span class="dropdown-icon">👤</span> My Profile
-                        </button>
-                        <button class="account-dropdown-item" id="dropdownNewPageBtn">
-                            <span class="dropdown-icon">📄</span> New Page
-                        </button>
-
-                        <div class="account-dropdown-divider"></div>
-
-                        <button class="account-dropdown-item" id="dropdownSettingsBtn">
-                            <span class="dropdown-icon">⚙️</span> Settings
-                        </button>
-                    </div>
-
-                    <!-- Settings sub-menu with inline profile editing -->
-                    <div class="hidden" id="accountSettingsMenu">
-                        <button class="account-dropdown-item" id="dropdownSettingsBackBtn">
-                            <span class="dropdown-icon">←</span> Back
-                        </button>
-                        <div class="account-dropdown-divider"></div>
-
-                        <div class="settings-form" style="padding: 6px 8px;">
-                            <div class="settings-field" style="margin-bottom: 10px;">
-                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Display Name</label>
-                                <input type="text" id="settingsDisplayName" class="settings-input" placeholder="Display Name" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
-                            </div>
-                            <div class="settings-field" style="margin-bottom: 10px;">
-                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Username</label>
-                                <input type="text" id="settingsUsername" class="settings-input" placeholder="Username" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
-                            </div>
-                            <div class="settings-field" style="margin-bottom: 10px;">
-                                <label style="font-size: 0.7rem; color:#60a5fa; display:block; margin-bottom:4px;">Bio</label>
-                                <textarea id="settingsBio" rows="3" placeholder="Tell something about yourself..." style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0; font-family:inherit; resize:vertical;"></textarea>
-                            </div>
-                            <div class="settings-error hidden" id="settingsError" style="color:#f87171; font-size:0.75rem; margin-bottom:8px;"></div>
-                            <button class="btn btn-primary btn-sm" id="settingsSaveBtn" style="width:100%; margin-bottom:10px;">Save Changes</button>
+                    <button class="account-dropdown-item" id="dropdownSettingsBtn"><span class="dropdown-icon">⚙️</span> Settings</button>
+                </div>
+                <div class="hidden" id="accountSettingsMenu">
+                    <button class="account-dropdown-item" id="dropdownSettingsBackBtn"><span class="dropdown-icon">←</span> Back</button>
+                    <div class="account-dropdown-divider"></div>
+                    <div class="settings-form" style="padding: 6px 8px;">
+                        <div class="settings-field" style="margin-bottom: 10px;">
+                            <label style="font-size:0.7rem; color:#60a5fa;">Display Name</label>
+                            <input type="text" id="settingsDisplayName" placeholder="Display Name" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
                         </div>
-
-                        <div class="account-dropdown-divider"></div>
-
-                        <button class="account-dropdown-item danger" id="dropdownLogoutBtn">
-                            <span class="dropdown-icon">→</span> Sign out
-                        </button>
+                        <div class="settings-field" style="margin-bottom: 10px;">
+                            <label style="font-size:0.7rem; color:#60a5fa;">Username</label>
+                            <input type="text" id="settingsUsername" placeholder="Username" style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0;">
+                        </div>
+                        <div class="settings-field" style="margin-bottom: 10px;">
+                            <label style="font-size:0.7rem; color:#60a5fa;">Bio</label>
+                            <textarea id="settingsBio" rows="3" placeholder="Tell something about yourself..." style="width:100%; background:#0a0f1e; border:1px solid #334155; border-radius:6px; padding:6px 8px; color:#e2e8f0; font-family:inherit;"></textarea>
+                        </div>
+                        <div class="settings-error hidden" id="settingsError" style="color:#f87171; font-size:0.75rem;"></div>
+                        <button class="btn btn-primary btn-sm" id="settingsSaveBtn" style="width:100%;">Save Changes</button>
                     </div>
+                    <div class="account-dropdown-divider"></div>
+                    <button class="account-dropdown-item danger" id="dropdownLogoutBtn"><span class="dropdown-icon">→</span> Sign out</button>
                 </div>
             </div>
         </div>
-    </header>
+    </div>
+</header>
 
-    <main>
+<main>
+    <!-- AUTH SCREEN -->
+    <section class="auth-box" id="authBox">
+        <div class="auth-logo">✦</div>
+        <h2 id="authHeading">Sign In</h2>
+        <label for="authName" id="authNameLabel" class="hidden">Name</label>
+        <input type="text" id="authName" class="hidden" placeholder="Your name">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="••••••••">
+        <div class="auth-error hidden" id="authError"></div>
+        <div class="editor-actions">
+            <button class="btn btn-primary" id="authSubmitBtn">Sign In</button>
+        </div>
+        <p class="auth-switch"><span id="authSwitchText">Don't have an account?</span> <a href="#" id="authSwitchLink">Sign up</a></p>
+    </section>
 
-        <!-- AUTH SCREEN -->
-        <section class="auth-box" id="authBox">
-            <div class="auth-logo">✦</div>
-            <h2 id="authHeading">Sign In</h2>
-
-            <label for="authName" id="authNameLabel" class="hidden">Name</label>
-            <input type="text" id="authName" class="hidden" placeholder="Your name">
-
-            <label for="authEmail">Email</label>
-            <input type="email" id="authEmail" placeholder="you@example.com">
-
-            <label for="authPassword">Password</label>
-            <input type="password" id="authPassword" placeholder="••••••••">
-
-            <div class="auth-error hidden" id="authError"></div>
-
-            <div class="editor-actions">
-                <button class="btn btn-primary" id="authSubmitBtn">Sign In</button>
+    <!-- APP CONTENT -->
+    <div id="appContent" class="hidden">
+        <section class="hero hidden" id="hero">
+            <h2 id="welcomeHeading">Welcome</h2>
+            <p>Your personal space for ideas, projects, plans and your diary. Click <strong>+ New Page</strong> to get started.</p>
+            <div class="hero-actions">
+                <button class="btn btn-primary" id="newPageBtn">+ New Page</button>
+                <button class="btn" id="logoutBtn">Sign out</button>
             </div>
-
-            <p class="auth-switch">
-                <span id="authSwitchText">Don't have an account?</span>
-                <a href="#" id="authSwitchLink">Sign up</a>
-            </p>
         </section>
 
-        <!-- APP CONTENT (hidden until logged in) -->
-        <div id="appContent" class="hidden">
+        <section class="content" id="content"></section>
 
-            <!-- My Pages hero (only shown on my-pages view) -->
-            <section class="hero hidden" id="hero">
-                <h2 id="welcomeHeading">Welcome</h2>
-                <p>
-                    Your personal space for ideas, projects, plans and your diary.
-                    Click <strong>+ New Page</strong> to get started.
-                </p>
-                <div class="hero-actions">
-                    <button class="btn btn-primary" id="newPageBtn">+ New Page</button>
-                    <button class="btn" id="logoutBtn">Sign out</button>
+        <section class="page-view hidden" id="pageView">
+            <div class="page-view-header">
+                <h2 id="pageTitleDisplay"></h2>
+                <div class="page-actions">
+                    <button class="btn" id="editBtn">Edit</button>
+                    <button class="btn btn-danger" id="deleteBtn">Delete</button>
+                    <button class="btn" id="closeBtn">Close</button>
                 </div>
-            </section>
+            </div>
+            <div class="page-meta" id="pageMeta"></div>
+            <div class="page-content" id="pageContentDisplay"></div>
+        </section>
 
-            <!-- Page list / cards -->
-            <section class="content" id="content"></section>
+        <section class="editor hidden" id="editor">
+            <h2 id="editorHeading">New Page</h2>
+            <label for="pageTitleInput">Title</label>
+            <input type="text" id="pageTitleInput" placeholder="e.g. My idea for an app">
+            <label for="pageCategoryInput">Category</label>
+            <select id="pageCategoryInput">
+                <option value="Ideas">Ideas</option><option value="Projects">Projects</option>
+                <option value="Plans">Plans</option><option value="Diary">Diary</option><option value="Other">Other</option>
+            </select>
+            <label for="pageContentInput">Content</label>
+            <textarea id="pageContentInput" rows="12" placeholder="Write your thoughts here..."></textarea>
+            <div class="editor-actions">
+                <button class="btn btn-primary" id="saveBtn">Save</button>
+                <button class="btn" id="cancelBtn">Cancel</button>
+            </div>
+        </section>
 
-            <!-- Page view -->
-            <section class="page-view hidden" id="pageView">
-                <div class="page-view-header">
-                    <h2 id="pageTitleDisplay"></h2>
-                    <div class="page-actions">
-                        <button class="btn" id="editBtn">Edit</button>
-                        <button class="btn btn-danger" id="deleteBtn">Delete</button>
-                        <button class="btn" id="closeBtn">Close</button>
-                    </div>
-                </div>
-                <div class="page-meta" id="pageMeta"></div>
-                <div class="page-content" id="pageContentDisplay"></div>
-            </section>
+        <!-- COMMUNITY TAB -->
+        <section class="hidden" id="communityTab">
+            <div class="community-subnav">
+                <button class="subnav-btn active" data-subview="feed"><span class="subnav-icon">🔥</span> Feed</button>
+                <button class="subnav-btn" data-subview="members"><span class="subnav-icon">👥</span> Members</button>
+                <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin"><span class="subnav-icon">⚙️</span> Admin</button>
+            </div>
+            <div class="community-section" id="communityFeed">
+                <div class="feed-toolbar"><h2 class="feed-title">Community Feed</h2><button class="btn btn-primary" id="newPostBtn">+ New Post</button></div>
+                <div class="posts-grid" id="postsList"></div>
+            </div>
+            <div class="community-section hidden" id="communityMembers"><h2 class="feed-title">Members</h2><div class="content" id="membersList"></div></div>
+            <div class="community-section hidden" id="communityAdmin"><h2 class="section-heading">Admin Panel</h2><p class="section-subtext">Manage member roles and badges. Only the Owner can grant or remove Admin status.</p><div class="content" id="adminMembersList"></div></div>
+            <div class="profile-view hidden" id="profileView">
+                <button class="btn btn-back" id="profileBackBtn">← Back</button>
+                <div class="profile-header"><div class="profile-avatar" id="profileAvatar"></div><div class="profile-info"><h2 id="profileDisplayName"></h2><div class="profile-username" id="profileUsername"></div><div class="profile-badges" id="profileBadges"></div></div></div>
+                <div class="profile-bio" id="profileBio"></div><div class="profile-stats" id="profileStats"></div><div class="profile-meta" id="profileMeta"></div>
+                <button class="btn btn-primary hidden" id="editProfileBtn">Edit Profile</button>
+            </div>
+            <div class="profile-view hidden" id="profileEditView">
+                <button class="btn btn-back" id="profileEditBackBtn">← Back</button><h2 class="section-heading">Edit Profile</h2>
+                <div class="profile-edit-row"><label for="editDisplayName">Display Name</label><input type="text" id="editDisplayName"></div>
+                <div class="profile-edit-row"><label for="editUsername">Username</label><input type="text" id="editUsername"></div>
+                <div class="profile-edit-row"><label for="editBio">Bio</label><textarea id="editBio" rows="5"></textarea></div>
+                <div class="auth-error hidden" id="profileEditError"></div>
+                <div class="editor-actions"><button class="btn btn-primary" id="saveProfileBtn">Save</button></div>
+            </div>
+            <div class="editor hidden" id="postEditor">
+                <h2>New Post</h2>
+                <label for="postTitleInput">Title</label><input type="text" id="postTitleInput" placeholder="What's this about?">
+                <label for="postCategoryInput">Category</label><select id="postCategoryInput"><option value="Discussion">Discussion</option><option value="Announcement">Announcement</option><option value="Event">Event</option><option value="Idea">Idea</option></select>
+                <label for="postContentInput">Content</label><textarea id="postContentInput" rows="8" placeholder="Share something with the community..."></textarea>
+                <div class="editor-actions"><button class="btn btn-primary" id="savePostBtn">Post</button><button class="btn" id="cancelPostBtn">Cancel</button></div>
+            </div>
+        </section>
+    </div>
+</main>
 
-            <!-- Editor -->
-            <section class="editor hidden" id="editor">
-                <h2 id="editorHeading">New Page</h2>
+<footer><p>© 2026 The Zero Company</p></footer>
+<div class="dropdown-overlay hidden" id="dropdownOverlay"></div>
 
-                <label for="pageTitleInput">Title</label>
-                <input type="text" id="pageTitleInput" placeholder="e.g. My idea for an app">
+<script>
+// Additional dropdown wiring (rest is in script.js)
+document.addEventListener('DOMContentLoaded', () => {
+    const accountWrap = document.getElementById('accountWrap');
+    const accountBtn = document.getElementById('accountBtn');
+    const accountDropdown = document.getElementById('accountDropdown');
+    const dropdownOverlay = document.getElementById('dropdownOverlay');
+    const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
+    const dropdownNewPageBtn = document.getElementById('dropdownNewPageBtn');
+    const dropdownProfileBtn = document.getElementById('dropdownProfileBtn');
+    const dropdownSettingsBtn = document.getElementById('dropdownSettingsBtn');
+    const dropdownSettingsBackBtn = document.getElementById('dropdownSettingsBackBtn');
+    const accountMainMenu = document.getElementById('accountMainMenu');
+    const accountSettingsMenu = document.getElementById('accountSettingsMenu');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const newPageBtn = document.getElementById('newPageBtn');
+    const settingsDisplayName = document.getElementById('settingsDisplayName');
+    const settingsUsername = document.getElementById('settingsUsername');
+    const settingsBio = document.getElementById('settingsBio');
+    const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+    const settingsError = document.getElementById('settingsError');
 
-                <label for="pageCategoryInput">Category</label>
-                <select id="pageCategoryInput">
-                    <option value="Ideas">Ideas</option>
-                    <option value="Projects">Projects</option>
-                    <option value="Plans">Plans</option>
-                    <option value="Diary">Diary</option>
-                    <option value="Other">Other</option>
-                </select>
-
-                <label for="pageContentInput">Content</label>
-                <textarea id="pageContentInput" rows="12" placeholder="Write your thoughts here..."></textarea>
-
-                <div class="editor-actions">
-                    <button class="btn btn-primary" id="saveBtn">Save</button>
-                    <button class="btn" id="cancelBtn">Cancel</button>
-                </div>
-            </section>
-
-            <!-- ===================== COMMUNITY TAB ===================== -->
-            <section class="hidden" id="communityTab">
-
-                <!-- Community sub-navigation -->
-                <div class="community-subnav">
-                    <button class="subnav-btn active" data-subview="feed">
-                        <span class="subnav-icon">🔥</span> Feed
-                    </button>
-                    <button class="subnav-btn" data-subview="members">
-                        <span class="subnav-icon">👥</span> Members
-                    </button>
-                    <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin">
-                        <span class="subnav-icon">⚙️</span> Admin
-                    </button>
-                </div>
-
-                <!-- FEED -->
-                <div class="community-section" id="communityFeed">
-                    <div class="feed-toolbar">
-                        <h2 class="feed-title">Community Feed</h2>
-                        <button class="btn btn-primary" id="newPostBtn">+ New Post</button>
-                    </div>
-                    <div class="posts-grid" id="postsList">
-                        <!-- Posts render here -->
-                    </div>
-                </div>
-
-                <!-- MEMBERS -->
-                <div class="community-section hidden" id="communityMembers">
-                    <h2 class="feed-title">Members</h2>
-                    <div class="content" id="membersList">
-                        <!-- Member cards render here -->
-                    </div>
-                </div>
-
-                <!-- ADMIN PANEL -->
-                <div class="community-section hidden" id="communityAdmin">
-                    <h2 class="section-heading">Admin Panel</h2>
-                    <p class="section-subtext">Manage member roles and badges. Only the Owner can grant or remove Admin status.</p>
-                    <div class="content" id="adminMembersList">
-                        <!-- Admin-editable member cards render here -->
-                    </div>
-                </div>
-
-                <!-- PROFILE VIEW -->
-                <div class="profile-view hidden" id="profileView">
-                    <button class="btn btn-back" id="profileBackBtn">← Back</button>
-
-                    <div class="profile-header">
-                        <div class="profile-avatar" id="profileAvatar"></div>
-                        <div class="profile-info">
-                            <h2 id="profileDisplayName"></h2>
-                            <div class="profile-username" id="profileUsername"></div>
-                            <div class="profile-badges" id="profileBadges"></div>
-                        </div>
-                    </div>
-
-                    <div class="profile-bio" id="profileBio"></div>
-                    <div class="profile-stats" id="profileStats"></div>
-                    <div class="profile-meta" id="profileMeta"></div>
-
-                    <button class="btn btn-primary hidden" id="editProfileBtn">Edit Profile</button>
-                </div>
-
-                <!-- PROFILE EDIT VIEW -->
-                <div class="profile-view hidden" id="profileEditView">
-                    <button class="btn btn-back" id="profileEditBackBtn">← Back</button>
-                    <h2 class="section-heading">Edit Profile</h2>
-
-                    <div class="profile-edit-row">
-                        <label for="editDisplayName">Display Name</label>
-                        <input type="text" id="editDisplayName">
-                    </div>
-                    <div class="profile-edit-row">
-                        <label for="editUsername">Username</label>
-                        <input type="text" id="editUsername">
-                    </div>
-                    <div class="profile-edit-row">
-                        <label for="editBio">Bio</label>
-                        <textarea id="editBio" rows="5"></textarea>
-                    </div>
-
-                    <div class="auth-error hidden" id="profileEditError"></div>
-
-                    <div class="editor-actions">
-                        <button class="btn btn-primary" id="saveProfileBtn">Save</button>
-                    </div>
-                </div>
-
-                <!-- POST COMPOSER -->
-                <div class="editor hidden" id="postEditor">
-                    <h2>New Post</h2>
-
-                    <label for="postTitleInput">Title</label>
-                    <input type="text" id="postTitleInput" placeholder="What's this about?">
-
-                    <label for="postCategoryInput">Category</label>
-                    <select id="postCategoryInput">
-                        <option value="Discussion">Discussion</option>
-                        <option value="Announcement">Announcement</option>
-                        <option value="Event">Event</option>
-                        <option value="Idea">Idea</option>
-                    </select>
-
-                    <label for="postContentInput">Content</label>
-                    <textarea id="postContentInput" rows="8" placeholder="Share something with the community..."></textarea>
-
-                    <div class="editor-actions">
-                        <button class="btn btn-primary" id="savePostBtn">Post</button>
-                        <button class="btn" id="cancelPostBtn">Cancel</button>
-                    </div>
-                </div>
-
-            </section>
-            <!-- =================== END COMMUNITY TAB =================== -->
-
-        </div>
-
-    </main>
-
-    <footer>
-        <p>© 2026 The Zero Company</p>
-    </footer>
-
-    <!-- Account dropdown overlay to close on outside click -->
-    <div class="dropdown-overlay hidden" id="dropdownOverlay"></div>
-
-    <script>
-    // Additional dropdown wiring - main logic inside script.js, but we need to sync settings form
-    document.addEventListener('DOMContentLoaded', () => {
-        const accountWrap      = document.getElementById('accountWrap');
-        const accountBtn       = document.getElementById('accountBtn');
-        const accountDropdown  = document.getElementById('accountDropdown');
-        const dropdownOverlay  = document.getElementById('dropdownOverlay');
-        const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
-        const dropdownNewPageBtn = document.getElementById('dropdownNewPageBtn');
-        const dropdownProfileBtn = document.getElementById('dropdownProfileBtn');
-        const dropdownSettingsBtn = document.getElementById('dropdownSettingsBtn');
-        const dropdownSettingsBackBtn = document.getElementById('dropdownSettingsBackBtn');
-        const accountMainMenu  = document.getElementById('accountMainMenu');
-        const accountSettingsMenu = document.getElementById('accountSettingsMenu');
-        const logoutBtn        = document.getElementById('logoutBtn');
-        const newPageBtn       = document.getElementById('newPageBtn');
-        
-        // Settings form elements
-        const settingsDisplayName = document.getElementById('settingsDisplayName');
-        const settingsUsername = document.getElementById('settingsUsername');
-        const settingsBio = document.getElementById('settingsBio');
-        const settingsSaveBtn = document.getElementById('settingsSaveBtn');
-        const settingsError = document.getElementById('settingsError');
-
-        function showMainMenu() {
-            accountSettingsMenu.classList.add('hidden');
-            accountMainMenu.classList.remove('hidden');
+    function showMainMenu() { accountSettingsMenu.classList.add('hidden'); accountMainMenu.classList.remove('hidden'); }
+    function showSettingsMenu() {
+        if (window.currentProfile) {
+            settingsDisplayName.value = window.currentProfile.display_name || '';
+            settingsUsername.value = window.currentProfile.username || '';
+            settingsBio.value = window.currentProfile.bio || '';
         }
-        function showSettingsMenu() {
-            // Fill settings form with current profile data before showing
-            if (window.currentProfile) {
-                settingsDisplayName.value = window.currentProfile.display_name || '';
-                settingsUsername.value = window.currentProfile.username || '';
-                settingsBio.value = window.currentProfile.bio || '';
-            }
-            accountMainMenu.classList.add('hidden');
-            accountSettingsMenu.classList.remove('hidden');
-            settingsError.classList.add('hidden');
+        accountMainMenu.classList.add('hidden');
+        accountSettingsMenu.classList.remove('hidden');
+        settingsError.classList.add('hidden');
+    }
+    function openDropdown() { accountDropdown.classList.remove('hidden'); dropdownOverlay.classList.remove('hidden'); accountBtn.setAttribute('aria-expanded', 'true'); }
+    function closeDropdown() { accountDropdown.classList.add('hidden'); dropdownOverlay.classList.add('hidden'); accountBtn.setAttribute('aria-expanded', 'false'); showMainMenu(); }
+
+    accountBtn.addEventListener('click', (e) => { e.stopPropagation(); accountDropdown.classList.contains('hidden') ? openDropdown() : closeDropdown(); });
+    accountWrap.addEventListener('mouseenter', openDropdown);
+    accountWrap.addEventListener('mouseleave', closeDropdown);
+    dropdownOverlay.addEventListener('click', closeDropdown);
+    dropdownSettingsBtn.addEventListener('click', showSettingsMenu);
+    dropdownSettingsBackBtn.addEventListener('click', showMainMenu);
+
+    settingsSaveBtn.addEventListener('click', async () => {
+        const displayName = settingsDisplayName.value.trim();
+        const username = settingsUsername.value.trim();
+        const bio = settingsBio.value.trim();
+        if (!displayName || !username) { settingsError.textContent = "Display name and username are required."; settingsError.classList.remove('hidden'); return; }
+        settingsSaveBtn.disabled = true; settingsSaveBtn.textContent = "Saving...";
+        const { error } = await window.sb.from("profiles").update({ display_name: displayName, username, bio, updated_at: new Date().toISOString() }).eq("id", window.currentUser.id);
+        settingsSaveBtn.disabled = false; settingsSaveBtn.textContent = "Save Changes";
+        if (error) { settingsError.textContent = error.message; settingsError.classList.remove('hidden'); return; }
+        if (window.fetchProfile) await window.fetchProfile();
+        if (window.currentProfile) {
+            const avatarDiv = document.getElementById('accountDropdownAvatar');
+            const nameSpan = document.getElementById('accountDropdownName');
+            const roleSpan = document.getElementById('accountDropdownRole');
+            const topAvatar = document.getElementById('accountAvatar');
+            if (avatarDiv) avatarDiv.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
+            if (nameSpan) nameSpan.textContent = window.currentProfile.display_name || window.currentProfile.username;
+            if (roleSpan) roleSpan.textContent = window.currentProfile.role || "Member";
+            if (topAvatar) topAvatar.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
+            if (window.viewMode === 'my' && window.renderHome) window.renderHome();
+            const pageTitleEl = document.getElementById('pageTitle');
+            if (pageTitleEl && window.currentUser) pageTitleEl.textContent = `Encyclopedie van ${window.currentProfile?.display_name || window.currentUser.email?.split('@')[0] || ''}`;
+            const welcomeHeading = document.getElementById('welcomeHeading');
+            if (welcomeHeading && window.currentProfile) welcomeHeading.textContent = `Welcome, ${window.currentProfile.display_name || window.currentProfile.username}`;
         }
-
-        function openDropdown() {
-            accountDropdown.classList.remove('hidden');
-            dropdownOverlay.classList.remove('hidden');
-            accountBtn.setAttribute('aria-expanded', 'true');
-        }
-        function closeDropdown() {
-            accountDropdown.classList.add('hidden');
-            dropdownOverlay.classList.add('hidden');
-            accountBtn.setAttribute('aria-expanded', 'false');
-            showMainMenu();
-        }
-
-        accountBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            accountDropdown.classList.contains('hidden') ? openDropdown() : closeDropdown();
-        });
-
-        accountWrap.addEventListener('mouseenter', openDropdown);
-        accountWrap.addEventListener('mouseleave', closeDropdown);
-        dropdownOverlay.addEventListener('click', closeDropdown);
-
-        dropdownSettingsBtn.addEventListener('click', showSettingsMenu);
-        dropdownSettingsBackBtn.addEventListener('click', showMainMenu);
-
-        // Settings save handler
-        settingsSaveBtn.addEventListener('click', async () => {
-            const displayName = settingsDisplayName.value.trim();
-            const username = settingsUsername.value.trim();
-            const bio = settingsBio.value.trim();
-            if (!displayName || !username) {
-                settingsError.textContent = "Display name and username are required.";
-                settingsError.classList.remove('hidden');
-                return;
-            }
-            settingsSaveBtn.disabled = true;
-            settingsSaveBtn.textContent = "Saving...";
-            const { error } = await window.sb
-                .from("profiles")
-                .update({
-                    display_name: displayName,
-                    username: username,
-                    bio: bio,
-                    updated_at: new Date().toISOString()
-                })
-                .eq("id", window.currentUser.id);
-            settingsSaveBtn.disabled = false;
-            settingsSaveBtn.textContent = "Save Changes";
-            if (error) {
-                settingsError.textContent = error.message;
-                settingsError.classList.remove('hidden');
-                return;
-            }
-            // Refresh profile globally
-            if (window.fetchProfile) await window.fetchProfile();
-            // Update dropdown UI
-            if (window.currentProfile) {
-                const avatarDiv = document.getElementById('accountDropdownAvatar');
-                const nameSpan = document.getElementById('accountDropdownName');
-                const roleSpan = document.getElementById('accountDropdownRole');
-                const topAvatar = document.getElementById('accountAvatar');
-                if (avatarDiv) avatarDiv.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
-                if (nameSpan) nameSpan.textContent = window.currentProfile.display_name || window.currentProfile.username;
-                if (roleSpan) roleSpan.textContent = window.currentProfile.role || "Member";
-                if (topAvatar) topAvatar.textContent = (window.currentProfile.display_name || window.currentProfile.username || '?').charAt(0).toUpperCase();
-                // Also update page title and welcome heading if in my pages view
-                if (window.viewMode === 'my' && window.renderHome) window.renderHome();
-                const pageTitleEl = document.getElementById('pageTitle');
-                if (pageTitleEl && window.currentUser) {
-                    const name = window.currentProfile?.display_name || window.currentUser.email?.split('@')[0] || '';
-                    pageTitleEl.textContent = `Encyclopedie van ${name}`;
-                }
-                const welcomeHeading = document.getElementById('welcomeHeading');
-                if (welcomeHeading && window.currentProfile) {
-                    welcomeHeading.textContent = `Welcome, ${window.currentProfile.display_name || window.currentProfile.username}`;
-                }
-            }
-            settingsError.classList.add('hidden');
-            // Optionally show success briefly
-            const originalText = settingsSaveBtn.textContent;
-            settingsSaveBtn.textContent = "✓ Saved!";
-            setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
-        });
-
-        dropdownLogoutBtn.addEventListener('click', () => {
-            closeDropdown();
-            logoutBtn.click();
-        });
-
-        dropdownNewPageBtn.addEventListener('click', () => {
-            closeDropdown();
-            newPageBtn.click();
-        });
-
-        dropdownProfileBtn.addEventListener('click', () => {
-            closeDropdown();
-            const communityLink = document.querySelector('.navbar a[data-community]') ||
-                [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
-            if (communityLink) communityLink.click();
-            setTimeout(() => {
-                if (typeof window.openProfile === 'function' && window.currentUser) {
-                    window.openProfile(window.currentUser.id);
-                }
-            }, 300);
-        });
+        settingsError.classList.add('hidden');
+        settingsSaveBtn.textContent = "✓ Saved!";
+        setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
     });
-    </script>
 
+    dropdownLogoutBtn.addEventListener('click', () => { closeDropdown(); logoutBtn.click(); });
+    dropdownNewPageBtn.addEventListener('click', () => { closeDropdown(); newPageBtn.click(); });
+    dropdownProfileBtn.addEventListener('click', () => {
+        closeDropdown();
+        const communityLink = document.querySelector('.navbar a[data-community]') || [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
+        if (communityLink) communityLink.click();
+        setTimeout(() => { if (typeof window.openProfile === 'function' && window.currentUser) window.openProfile(window.currentUser.id); }, 300);
+    });
+});
+</script>
 </body>
 </html>
