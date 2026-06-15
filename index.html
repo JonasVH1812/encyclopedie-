@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Encyclopedie</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="script.js"></script>
@@ -14,20 +18,56 @@
 
     <div class="stars"></div>
 
+    <!-- ===== HEADER ===== -->
     <header>
-        <h1 class="titel" id="pageTitle">Encyclopedie</h1>
+        <div class="header-inner">
+            <h1 class="titel" id="pageTitle">Encyclopedie</h1>
 
-        <nav>
-            <ul class="navbar" id="navbar">
-                <!-- Pages get rendered here -->
-            </ul>
-        </nav>
+            <nav>
+                <ul class="navbar" id="navbar">
+                    <!-- Pages get rendered here -->
+                </ul>
+            </nav>
+
+            <!-- Account icon (top-right, shown when logged in) -->
+            <div class="account-wrap hidden" id="accountWrap">
+                <button class="account-btn" id="accountBtn" aria-label="Account menu" aria-expanded="false">
+                    <div class="account-avatar" id="accountAvatar">?</div>
+                </button>
+
+                <div class="account-dropdown hidden" id="accountDropdown">
+                    <div class="account-dropdown-header">
+                        <div class="account-dropdown-avatar" id="accountDropdownAvatar">?</div>
+                        <div>
+                            <div class="account-dropdown-name" id="accountDropdownName">—</div>
+                            <div class="account-dropdown-role" id="accountDropdownRole">Member</div>
+                        </div>
+                    </div>
+
+                    <div class="account-dropdown-divider"></div>
+
+                    <button class="account-dropdown-item" id="dropdownProfileBtn">
+                        <span class="dropdown-icon">👤</span> My Profile
+                    </button>
+                    <button class="account-dropdown-item" id="dropdownNewPageBtn">
+                        <span class="dropdown-icon">📄</span> New Page
+                    </button>
+
+                    <div class="account-dropdown-divider"></div>
+
+                    <button class="account-dropdown-item danger" id="dropdownLogoutBtn">
+                        <span class="dropdown-icon">→</span> Sign out
+                    </button>
+                </div>
+            </div>
+        </div>
     </header>
 
     <main>
 
         <!-- AUTH SCREEN -->
         <section class="auth-box" id="authBox">
+            <div class="auth-logo">✦</div>
             <h2 id="authHeading">Sign In</h2>
 
             <label for="authName" id="authNameLabel" class="hidden">Name</label>
@@ -54,12 +94,12 @@
         <!-- APP CONTENT (hidden until logged in) -->
         <div id="appContent" class="hidden">
 
-            <section class="hero" id="hero">
+            <!-- My Pages hero (only shown on my-pages view) -->
+            <section class="hero hidden" id="hero">
                 <h2 id="welcomeHeading">Welcome</h2>
                 <p>
-                    This is your personal space for ideas, projects, plans
-                    and your diary. Click "+ New Page" to get started, or
-                    click any page in the menu to read or edit it.
+                    Your personal space for ideas, projects, plans and your diary.
+                    Click <strong>+ New Page</strong> to get started.
                 </p>
                 <div class="hero-actions">
                     <button class="btn btn-primary" id="newPageBtn">+ New Page</button>
@@ -67,11 +107,10 @@
                 </div>
             </section>
 
-            <section class="content" id="content">
-                <!-- Page list / cards get rendered here -->
-            </section>
+            <!-- Page list / cards -->
+            <section class="content" id="content"></section>
 
-            <!-- Page view / editor -->
+            <!-- Page view -->
             <section class="page-view hidden" id="pageView">
                 <div class="page-view-header">
                     <h2 id="pageTitleDisplay"></h2>
@@ -115,23 +154,31 @@
 
                 <!-- Community sub-navigation -->
                 <div class="community-subnav">
-                    <button class="subnav-btn active" data-subview="feed">Feed</button>
-                    <button class="subnav-btn" data-subview="members">Members</button>
-                    <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin">Admin</button>
+                    <button class="subnav-btn active" data-subview="feed">
+                        <span class="subnav-icon">🔥</span> Feed
+                    </button>
+                    <button class="subnav-btn" data-subview="members">
+                        <span class="subnav-icon">👥</span> Members
+                    </button>
+                    <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin">
+                        <span class="subnav-icon">⚙️</span> Admin
+                    </button>
                 </div>
 
                 <!-- FEED -->
                 <div class="community-section" id="communityFeed">
-                    <div class="feed-new-post">
+                    <div class="feed-toolbar">
+                        <h2 class="feed-title">Community Feed</h2>
                         <button class="btn btn-primary" id="newPostBtn">+ New Post</button>
                     </div>
-                    <div class="content" id="postsList">
+                    <div class="posts-grid" id="postsList">
                         <!-- Posts render here -->
                     </div>
                 </div>
 
                 <!-- MEMBERS -->
                 <div class="community-section hidden" id="communityMembers">
+                    <h2 class="feed-title">Members</h2>
                     <div class="content" id="membersList">
                         <!-- Member cards render here -->
                     </div>
@@ -148,7 +195,7 @@
 
                 <!-- PROFILE VIEW -->
                 <div class="profile-view hidden" id="profileView">
-                    <button class="btn" id="profileBackBtn">← Back</button>
+                    <button class="btn btn-back" id="profileBackBtn">← Back</button>
 
                     <div class="profile-header">
                         <div class="profile-avatar" id="profileAvatar"></div>
@@ -160,9 +207,7 @@
                     </div>
 
                     <div class="profile-bio" id="profileBio"></div>
-
                     <div class="profile-stats" id="profileStats"></div>
-
                     <div class="profile-meta" id="profileMeta"></div>
 
                     <button class="btn btn-primary hidden" id="editProfileBtn">Edit Profile</button>
@@ -170,7 +215,7 @@
 
                 <!-- PROFILE EDIT VIEW -->
                 <div class="profile-view hidden" id="profileEditView">
-                    <button class="btn" id="profileEditBackBtn">← Back</button>
+                    <button class="btn btn-back" id="profileEditBackBtn">← Back</button>
                     <h2 class="section-heading">Edit Profile</h2>
 
                     <div class="profile-edit-row">
@@ -227,6 +272,71 @@
     <footer>
         <p>© 2026 The Zero Company</p>
     </footer>
+
+    <!-- Account dropdown overlay to close on outside click -->
+    <div class="dropdown-overlay hidden" id="dropdownOverlay"></div>
+
+    <script>
+    // Account dropdown wiring (no changes to script.js needed)
+    document.addEventListener('DOMContentLoaded', () => {
+        const accountBtn       = document.getElementById('accountBtn');
+        const accountDropdown  = document.getElementById('accountDropdown');
+        const dropdownOverlay  = document.getElementById('dropdownOverlay');
+        const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
+        const dropdownNewPageBtn = document.getElementById('dropdownNewPageBtn');
+        const dropdownProfileBtn = document.getElementById('dropdownProfileBtn');
+        const logoutBtn        = document.getElementById('logoutBtn');
+        const newPageBtn       = document.getElementById('newPageBtn');
+
+        function openDropdown() {
+            accountDropdown.classList.remove('hidden');
+            dropdownOverlay.classList.remove('hidden');
+            accountBtn.setAttribute('aria-expanded', 'true');
+        }
+        function closeDropdown() {
+            accountDropdown.classList.add('hidden');
+            dropdownOverlay.classList.add('hidden');
+            accountBtn.setAttribute('aria-expanded', 'false');
+        }
+
+        accountBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            accountDropdown.classList.contains('hidden') ? openDropdown() : closeDropdown();
+        });
+
+        dropdownOverlay.addEventListener('click', closeDropdown);
+
+        // Mirror the existing logout button
+        dropdownLogoutBtn.addEventListener('click', () => {
+            closeDropdown();
+            logoutBtn.click();
+        });
+
+        // Mirror new page button
+        dropdownNewPageBtn.addEventListener('click', () => {
+            closeDropdown();
+            newPageBtn.click();
+        });
+
+        // Open own profile in community
+        dropdownProfileBtn.addEventListener('click', () => {
+            closeDropdown();
+            // Navigate to community first, then open profile
+            const communityLink = document.querySelector('.navbar a[data-community]') ||
+                [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
+            if (communityLink) communityLink.click();
+            // openProfile is called from script.js after community is entered
+            setTimeout(() => {
+                if (typeof openProfile === 'function' && window.currentUser) {
+                    openProfile(window.currentUser.id);
+                }
+            }, 300);
+        });
+    });
+
+    // Keep account avatar in sync with app state
+    const _origShowApp = window.showApp;
+    </script>
 
 </body>
 </html>
