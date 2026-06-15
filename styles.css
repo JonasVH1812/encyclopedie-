@@ -1321,6 +1321,16 @@ footer {
     color: #22d3ee;
     border-color: rgba(34, 211, 238, .4);
 }
+.badge-grappige-spast {
+    background: rgba(34, 211, 238, .15);
+    color: #ff69b4;
+    border-color: rgba(34, 211, 238, .4);
+}
+.badge-prof-website-breker{
+    background: rgba(34, 211, 238, .15);
+    color: #ff0000;
+    border-color: rgba(34, 211, 238, .4);  
+}
 
 /* Generic fallback for unknown/future tags */
 [class^="badge-"]:not(.badge-owner):not(.badge-admin):not(.badge-member):not(.badge-vip):not(.badge-contributor):not(.badge-co-owner):not(.badge-moderator) {
@@ -1466,13 +1476,4 @@ footer {
         padding-left: 0;
     }
 }
-.badge-grappige-spast {
-    display: inline-block;
-    padding: 4px 10px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: 999px;
-    background: rgba(255, 105, 180, 0.15);
-    color: #ff69b4;
-    border: 1px solid rgba(255, 105, 180, 0.4);
-}
+
