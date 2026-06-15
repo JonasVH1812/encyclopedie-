@@ -1323,13 +1323,13 @@ footer {
 }
 .badge-grappige-spast {
     background: rgba(34, 211, 238, .15);
-    color: #ff69b4;
-    border-color: rgba(34, 211, 238, .4);
+    color: ##ff00dd;
+    border-color: rgba(235, 60, 255, 0.4);
 }
 .badge-prof-website-breker{
     background: rgba(34, 211, 238, .15);
     color: #ff0000;
-    border-color: rgba(34, 211, 238, .4);  
+    border-color: rgba(255, 0, 0, 0.4);  
 }
 
 /* Generic fallback for unknown/future tags */
