@@ -186,7 +186,8 @@ nav { flex: 1; overflow: hidden; }
 
 .account-dropdown {
     position: absolute;
-    top: calc(100% + 10px);
+    top: 100%;
+    margin-top: 2px;
     right: 0;
     width: 220px;
     background: rgba(15,23,42,.97);
