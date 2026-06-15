@@ -1290,3 +1290,41 @@ footer {
 
     padding: 8px 12px;
 }
+/* ===================== CUSTOM TAG BADGES ===================== */
+
+/* Fallback for any tag that doesn't have a specific class */
+.badge {
+    white-space: nowrap;
+}
+
+/* Custom tags — all get a distinct color so they stand out */
+.badge-prof-zager {
+    background: rgba(251, 113, 133, .15);
+    color: #fb7185;
+    border-color: rgba(251, 113, 133, .4);
+}
+
+.badge-nummer-1-mama {
+    background: rgba(244, 114, 182, .15);
+    color: #f472b6;
+    border-color: rgba(244, 114, 182, .4);
+}
+
+.badge-chernobly-tester {
+    background: rgba(163, 230, 53, .15);
+    color: #a3e635;
+    border-color: rgba(163, 230, 53, .4);
+}
+
+.badge-langste-niet-ai-post-owner {
+    background: rgba(34, 211, 238, .15);
+    color: #22d3ee;
+    border-color: rgba(34, 211, 238, .4);
+}
+
+/* Generic fallback for unknown/future tags */
+[class^="badge-"]:not(.badge-owner):not(.badge-admin):not(.badge-member):not(.badge-vip):not(.badge-contributor):not(.badge-co-owner):not(.badge-moderator) {
+    background: rgba(129, 140, 248, .15);
+    color: #818cf8;
+    border-color: rgba(129, 140, 248, .4);
+}
