@@ -38,6 +38,18 @@ const TAG_OPTIONS = [
     "prof website breker",
     "#1 homegirl"
 ];
+const BADGE_DESCRIPTIONS = {
+    "Co-Owner": "Co-owner of the community",
+    "VIP": "Very Important Person",
+    "Contributor": "Active contributor",
+    "Moderator": "Community moderator",
+    "Prof zager": "Professional zager",
+    "nummer 1 mama": "Number 1 mama",
+    "chernobly tester": "Chernobly tester",
+    "Langste niet ai post owner": "Owner of the longest non-AI post",
+    "grappige spast": "Funny spast",
+    "prof website breker": "Professional website breaker - known for breaking things!"
+};
 
 const pageTitle      = document.getElementById("pageTitle");
 const navbar         = document.getElementById("navbar");
@@ -175,10 +187,11 @@ function renderBadges(container, profile) {
         const span = document.createElement("span");
         span.className = badgeClass(tag);
         span.textContent = tag;
+        // Add tooltip from description map
+        span.title = BADGE_DESCRIPTIONS[tag] || '';
         container.appendChild(span);
     });
 }
-
 function isAdminOrOwner(profile) {
     return profile && (profile.role === "Owner" || profile.role === "Admin");
 }
