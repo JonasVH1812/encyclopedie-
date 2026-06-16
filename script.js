@@ -1,17 +1,14 @@
-/* ===== SPOTLIGHT EFFECT ===== */
 document.addEventListener("mousemove", (e) => {
     document.body.style.setProperty("--x", e.clientX + "px");
     document.body.style.setProperty("--y", e.clientY + "px");
 });
 
-/* ===== SUPABASE SETUP ===== */
 const SUPABASE_URL = "https://yxtcyfxupfhlgfknhfke.supabase.co";
 const SUPABASE_KEY = "sb_publishable_QNNFueMNFT6fnpEhXNdzDg__s-xQm5M";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 window.sb = sb;
 
-/* ===== STATE ===== */
 let pages = [];
 let currentPageId = null;
 let activeCategory = "All";
@@ -42,8 +39,6 @@ const TAG_OPTIONS = [
     "#1 homegirl"
 ];
 
-
-/* ===== ELEMENTS ===== */
 const pageTitle      = document.getElementById("pageTitle");
 const navbar         = document.getElementById("navbar");
 const content        = document.getElementById("content");
@@ -118,7 +113,6 @@ const saveBtn    = document.getElementById("saveBtn");
 const cancelBtn  = document.getElementById("cancelBtn");
 const logoutBtn  = document.getElementById("logoutBtn");
 
-// Account dropdown elements
 const accountWrap        = document.getElementById("accountWrap");
 const accountAvatar      = document.getElementById("accountAvatar");
 const accountDropdownAvatar = document.getElementById("accountDropdownAvatar");
@@ -138,7 +132,6 @@ const accountMainMenu       = document.getElementById("accountMainMenu");
 const accountSettingsMenu   = document.getElementById("accountSettingsMenu");
 const dropdownOverlay       = document.getElementById("dropdownOverlay");
 
-/* ===== HELPERS ===== */
 function formatDate(ts) {
     const d = new Date(ts);
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
@@ -194,7 +187,6 @@ function isOwnerUser(profile) {
     return profile && profile.role === "Owner";
 }
 
-/* ===== ACCOUNT DROPDOWN UI ===== */
 function updateAccountUI() {
     if (!currentProfile) return;
     const initial = getInitial(currentProfile.display_name || currentProfile.username);
@@ -331,7 +323,6 @@ function setupAccountDropdown() {
     }
 }
 
-/* ===== AUTH UI ===== */
 function setAuthMode(mode) {
     authMode = mode;
     authError.classList.add("hidden");
@@ -435,7 +426,6 @@ async function showApp() {
     await enterCommunity();
 }
 
-/* ===== DATA ===== */
 async function fetchProfile() {
     let { data, error } = await sb.from("profiles").select("*").eq("id", currentUser.id).maybeSingle();
     if (error) console.error("fetchProfile error:", error);
@@ -471,7 +461,6 @@ async function fetchPages() {
     }));
 }
 
-/* ===== NAVBAR & HOME (All first, then Community, then categories) ===== */
 function renderNavbar() {
     navbar.innerHTML = "";
 
@@ -540,7 +529,6 @@ function renderHome() {
     });
 }
 
-/* ===================== COMMUNITY ===================== */
 async function enterCommunity() {
     showOnly(communityTab);
     hero.classList.add("hidden");
@@ -575,7 +563,6 @@ document.querySelectorAll(".subnav-btn").forEach(btn =>
     btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview))
 );
 
-/* FEED */
 async function renderFeed() {
     postsList.innerHTML = "";
     const loading = document.createElement("div");
@@ -892,7 +879,6 @@ async function deletePost(postId) {
     renderFeed();
 }
 
-/* POST EDITOR */
 newPostBtn.addEventListener("click", () => {
     postTitleInput.value = "";
     postCategoryInput.value = "Discussion";
@@ -929,7 +915,6 @@ savePostBtn.addEventListener("click", async () => {
     }
 });
 
-/* MEMBERS */
 async function fetchMembers() {
     const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
     if (error) console.error(error);
@@ -1015,7 +1000,6 @@ async function renderMembers() {
     });
 }
 
-/* PROFILE */
 async function openProfile(userId) {
     viewingProfileId = userId;
 
@@ -1091,7 +1075,6 @@ saveProfileBtn.addEventListener("click", async () => {
     await openProfile(currentUser.id);
 });
 
-/* ========== ADMIN PANEL ========== */
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -1150,7 +1133,6 @@ function renderAdminCard(member, isOwner) {
         setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
     }
 
-    // Role select - only Owner can change roles
     const roleSelect = document.createElement("select");
     const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
     const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
@@ -1191,14 +1173,12 @@ function renderAdminCard(member, isOwner) {
     });
     controls.appendChild(roleSelect);
 
-    // Tag add select - Admins can add tags to Members only
     const tagSelect = document.createElement("select");
     const blankOpt = document.createElement("option");
     blankOpt.value = "";
     blankOpt.textContent = "+ Add tag";
     tagSelect.appendChild(blankOpt);
 
-    // Check if current user can modify tags for this member
     const canModifyTags = isOwner || (isAdminOrOwner(currentProfile) && member.role === "Member");
     if (!canModifyTags) tagSelect.disabled = true;
 
@@ -1240,7 +1220,6 @@ function renderAdminCard(member, isOwner) {
     });
     controls.appendChild(tagSelect);
 
-    // Tag list with reorder buttons - Admins can reorder tags for Members
     const tagListContainer = document.createElement("div");
     tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
 
@@ -1333,7 +1312,6 @@ function renderAdminCard(member, isOwner) {
     controls.appendChild(tagListContainer);
     controls.appendChild(statusLabel);
 
-    // View profile button
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn btn-sm";
     viewBtn.textContent = "View Profile";
@@ -1346,7 +1324,6 @@ function renderAdminCard(member, isOwner) {
     adminMembersList.appendChild(card);
 }
 
-/* PAGE FUNCTIONS */
 function openPage(id) {
     const p = pages.find(pg => pg.id === id);
     if (!p) return;
@@ -1456,7 +1433,6 @@ async function deletePage() {
     pageView.appendChild(confirmBar);
 }
 
-/* ===== EVENT LISTENERS ===== */
 newPageBtn.addEventListener("click", () => openEditor(null));
 editBtn.addEventListener("click", () => openEditor(currentPageId));
 deleteBtn.addEventListener("click", deletePage);
@@ -1464,5 +1440,4 @@ closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); }
 saveBtn.addEventListener("click", savePage);
 cancelBtn.addEventListener("click", () => currentPageId ? openPage(currentPageId) : renderHome());
 
-/* ===== INIT ===== */
 setAuthMode("signin");
