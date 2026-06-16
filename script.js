@@ -45,7 +45,7 @@ const BADGE_DESCRIPTIONS = {
     "Moderator": "Community moderator",
     "Prof zager": "Professional zager",
     "nummer 1 mama": "De aller beste mama",
-    "chernobly tester": "website getest in de dagen dat hij elke dag kon exploderen",
+    "chernobly tester": "website getest in de dagen dat hij elke dag kon exploderen en dat ook deed",
     "Langste niet ai post owner": "lansge bullshit post dat geen ai is",
     "grappige spast": "speciale badge voor lars de spast",
     "prof website breker": "krijg je als je de website 1 of meerdere keren breekt of meer dan 5 fouten vind",
