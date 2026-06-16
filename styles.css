@@ -1225,6 +1225,11 @@ footer {
     color: #fb7185;
     border-color: rgba(251,113,133,.35);
 }
+.badge-#1-homegirl{
+    background: rgba(235,60,255,.1);
+    color: #e040fb;
+    border-color: rgba(235,60,255,.35);
+}
 
 .badge-nummer-1-mama {
     background: rgba(244,114,182,.1);
