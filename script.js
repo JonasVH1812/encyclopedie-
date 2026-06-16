@@ -36,7 +36,7 @@ const TAG_OPTIONS = [
     "Langste niet ai post owner",
     "grappige spast",
     "prof website breker",
-    "nummer 1 homegirl"
+    "#1 homegirl"
 ];
 const BADGE_DESCRIPTIONS = {
     "Co-Owner": "Co-owner van de community",
@@ -49,7 +49,7 @@ const BADGE_DESCRIPTIONS = {
     "Langste niet ai post owner": "lansge bullshit post dat geen ai is",
     "grappige spast": "speciale badge voor lars de spast",
     "prof website breker": "krijg je als je de website 1 of meerdere keren breekt of meer dan 5 fouten vind",
-    "nummer 1 homegirl": "speciale badge voor de beste home girl"
+    "#1 homegirl": "speciale badge voor de beste home girl"
 };
 
 const pageTitle      = document.getElementById("pageTitle");
