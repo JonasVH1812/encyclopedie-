@@ -26,6 +26,7 @@ let members = [];
 let profileStatsMap = {};
 let viewingProfileId = null;
 
+const OWNER_EMAIL = "removed@example.com";
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
 const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
 const TAG_OPTIONS = [
@@ -584,6 +585,7 @@ async function renderFeed() {
     const { data, error } = await sb
         .from("community_posts")
         .select(`*, profiles!fk_community_posts_user_id(display_name, username, role, extra_tags)`)
+        .order("pinned", { ascending: false })
         .order("created_at", { ascending: false });
 
     postsList.innerHTML = "";
@@ -612,10 +614,17 @@ async function renderFeed() {
 
 function buildPostCard(post, container) {
     const card = document.createElement("div");
-    card.className = "post-card";
+    card.className = "post-card" + (post.pinned ? " pinned" : "");
 
     const header = document.createElement("div");
     header.className = "post-card-header";
+
+    if (post.pinned) {
+        const pinBadge = document.createElement("span");
+        pinBadge.className = "pin-badge";
+        pinBadge.textContent = "📌 Pinned";
+        header.appendChild(pinBadge);
+    }
 
     const authorLink = document.createElement("a");
     authorLink.className = "post-author-link";
@@ -652,6 +661,18 @@ function buildPostCard(post, container) {
     if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
         const actions = document.createElement("div");
         actions.className = "post-card-actions";
+
+        if (isAdminOrOwner(currentProfile)) {
+            const pinBtn = document.createElement("button");
+            pinBtn.className = "btn btn-sm btn-pin";
+            pinBtn.textContent = post.pinned ? "Unpin post" : "📌 Pin post";
+            pinBtn.addEventListener("click", async () => {
+                pinBtn.disabled = true;
+                await togglePin(post.id, !post.pinned);
+            });
+            actions.appendChild(pinBtn);
+        }
+
         const delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger btn-sm";
         delBtn.textContent = "Delete post";
@@ -854,6 +875,15 @@ async function loadComments(postId, listEl) {
 
         listEl.appendChild(el);
     });
+}
+
+async function togglePin(postId, pinned) {
+    const { error } = await sb.from("community_posts").update({ pinned }).eq("id", postId);
+    if (error) {
+        alert("Could not update pin: " + error.message);
+        return;
+    }
+    await renderFeed();
 }
 
 async function deletePost(postId) {
