@@ -171,7 +171,10 @@ function getInitial(name) {
 }
 
 function badgeClass(role) {
-    const key = (role || "Member").toLowerCase().replace(/\s+/g, "-");
+    const key = (role || "Member")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
     return "badge badge-" + key;
 }
 
