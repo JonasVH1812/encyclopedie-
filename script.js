@@ -48,7 +48,7 @@ const BADGE_DESCRIPTIONS = {
     "chernobly tester": "website getest in de dagen dat hij elke dag kon exploderen",
     "Langste niet ai post owner": "lansge bullshit post dat geen ai is",
     "grappige spast": "speciale badge voor lars de spast",
-    "prof website breker": "krijg je als je de website 1 of meerdere keren breekt of meer dan 5 fouten vind"
+    "prof website breker": "krijg je als je de website 1 of meerdere keren breekt of meer dan 5 fouten vind",
     "#1 homegirl": "speciale badge voor de beste home girl"
 };
 
