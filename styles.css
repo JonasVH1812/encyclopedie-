@@ -873,6 +873,38 @@ footer {
     flex-wrap: wrap;
 }
 
+/* PINNED POSTS */
+
+.post-card.pinned {
+    border-color: rgba(251,191,36,.4);
+    background: rgba(251,191,36,.04);
+    box-shadow: 0 0 0 1px rgba(251,191,36,.12);
+}
+
+.pin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #fbbf24;
+    background: rgba(251,191,36,.1);
+    border: 1px solid rgba(251,191,36,.3);
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.btn-pin {
+    color: #fbbf24;
+    border-color: rgba(251,191,36,.35);
+}
+
+.btn-pin:hover {
+    background: rgba(251,191,36,.1);
+}
+
 /* ROLE BADGES */
 
 .badge {
