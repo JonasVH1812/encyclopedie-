@@ -41,6 +41,7 @@ const TAG_OPTIONS = [
     "prof website breker"
 ];
 
+
 /* ===== ELEMENTS ===== */
 const pageTitle      = document.getElementById("pageTitle");
 const navbar         = document.getElementById("navbar");
