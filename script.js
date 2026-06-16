@@ -44,11 +44,11 @@ const BADGE_DESCRIPTIONS = {
     "Contributor": "Active contributor",
     "Moderator": "Community moderator",
     "Prof zager": "Professional zager",
-    "nummer 1 mama": "Number 1 mama",
-    "chernobly tester": "Chernobly tester",
-    "Langste niet ai post owner": "Owner of the longest non-AI post",
-    "grappige spast": "Funny spast",
-    "prof website breker": "Professional website breaker - known for breaking things!"
+    "nummer 1 mama": "De aller beste mama",
+    "chernobly tester": "website getest in de dagen dat hij elke dag kon exploderen",
+    "Langste niet ai post owner": "lansge bullshit post dat geen ai is",
+    "grappige spast": "speciaale badge voor lars de spast",
+    "prof website breker": "krijg je als je de website 1 of meerdre keren breekt of meer dan 5 fouten vind"
 };
 
 const pageTitle      = document.getElementById("pageTitle");
