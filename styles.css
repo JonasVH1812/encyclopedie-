@@ -5,10 +5,11 @@
 }
 
 ::-webkit-scrollbar { display: none; }
+
 html {
     scrollbar-width: none;
     scroll-behavior: smooth;
-    background: #0a0f1e;
+    background: #0a0f1e; /* solid dark fill for safe areas */
 }
 
 body {
@@ -21,6 +22,7 @@ body {
     position: relative;
     overflow-x: hidden;
     animation: fadeIn .6s ease;
+    padding: 0; /* ensure no extra gaps */
 }
 
 body::before {
@@ -51,6 +53,7 @@ body::before {
     z-index: -1;
 }
 
+/* === HEADER – safe‑area aware === */
 header {
     position: sticky;
     top: 0;
@@ -58,6 +61,7 @@ header {
     background: rgba(10,15,30,.9);
     backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(51,65,85,.6);
+    padding-top: env(safe-area-inset-top, 20px); /* push below status bar */
 }
 
 .header-inner {
@@ -65,6 +69,7 @@ header {
     margin: 0 auto;
     padding: 0 28px;
     height: 64px;
+    min-height: 64px;
     display: flex;
     align-items: center;
     gap: 20px;
@@ -78,7 +83,7 @@ header {
     white-space: nowrap;
     letter-spacing: -.01em;
     flex-shrink: 0;
-    animation: none;
+    line-height: 1.2;
 }
 
 nav { flex: 1; overflow: hidden; }
@@ -129,6 +134,7 @@ nav { flex: 1; overflow: hidden; }
     background: rgba(251,191,36,.1);
 }
 
+/* === ACCOUNT === */
 .account-wrap {
     position: relative;
     flex-shrink: 0;
@@ -156,6 +162,9 @@ nav { flex: 1; overflow: hidden; }
     color: #0a0f1e;
     border: 2px solid rgba(96,165,250,.3);
     transition: border-color .2s, box-shadow .2s;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
 }
 
 .account-btn:hover .account-avatar {
@@ -206,8 +215,6 @@ nav { flex: 1; overflow: hidden; }
     font-size: 1rem;
     color: #0a0f1e;
     flex-shrink: 0;
-}
-.account-dropdown-avatar {
     background-size: cover !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
@@ -275,6 +282,7 @@ nav { flex: 1; overflow: hidden; }
     z-index: 150;
 }
 
+/* === MAIN CONTENT === */
 main {
     flex: 1;
     max-width: 1280px;
@@ -285,6 +293,7 @@ main {
     z-index: 1;
 }
 
+/* === AUTH BOX === */
 .auth-box {
     max-width: 420px;
     margin: 60px auto;
@@ -363,6 +372,7 @@ main {
 
 .auth-switch a:hover { color: #fbbf24; }
 
+/* === HERO === */
 .hero {
     text-align: center;
     margin-bottom: 40px;
@@ -394,6 +404,7 @@ main {
     flex-wrap: wrap;
 }
 
+/* === BUTTONS === */
 .btn {
     background: rgba(30,41,59,.8);
     color: #e2e8f0;
@@ -453,6 +464,7 @@ main {
     font-size: .8rem;
 }
 
+/* === CONTENT GRID (Pages) === */
 .content {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -534,6 +546,7 @@ article .card-author {
     font-size: .9rem;
 }
 
+/* === PAGE VIEW === */
 .page-view {
     background: rgba(15,23,42,.8);
     backdrop-filter: blur(12px);
@@ -594,6 +607,7 @@ article .card-author {
     font-size: .95rem;
 }
 
+/* === EDITOR (Pages) === */
 .editor {
     background: rgba(15,23,42,.8);
     backdrop-filter: blur(12px);
@@ -677,6 +691,7 @@ footer {
     font-size: .8rem;
 }
 
+/* === COMMUNITY === */
 .section-heading {
     font-family: 'Space Grotesk', sans-serif;
     color: #fbbf24;
@@ -753,6 +768,7 @@ footer {
     max-width: 760px;
 }
 
+/* === POST CARD === */
 .post-card {
     background: rgba(15,23,42,.75);
     backdrop-filter: blur(10px);
@@ -775,8 +791,9 @@ footer {
 .post-card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
     flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-bottom: 4px;
 }
 
 .post-author-link {
@@ -786,21 +803,23 @@ footer {
     text-decoration: none;
     cursor: pointer;
     transition: color .2s;
+    white-space: nowrap;
 }
 
 .post-author-link:hover { color: #fbbf24; }
 
 .post-card-category {
-    font-size: .68rem;
+    font-size: .65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .08em;
     color: #fbbf24;
     background: rgba(251,191,36,.08);
     border: 1px solid rgba(251,191,36,.2);
-    padding: 2px 8px;
+    padding: 2px 10px;
     border-radius: 4px;
     margin-left: auto;
+    white-space: nowrap;
 }
 
 .post-card h3 {
@@ -838,7 +857,7 @@ footer {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: .68rem;
+    font-size: .6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .06em;
@@ -847,6 +866,7 @@ footer {
     border: 1px solid rgba(251,191,36,.3);
     padding: 2px 8px;
     border-radius: 999px;
+    white-space: nowrap;
 }
 
 .btn-pin {
@@ -858,13 +878,14 @@ footer {
     background: rgba(251,191,36,.1);
 }
 
+/* === BADGES === */
 .badge {
     display: inline-block;
-    font-size: .65rem;
+    font-size: .6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .05em;
-    padding: 2px 7px;
+    padding: 2px 8px;
     border-radius: 999px;
     border: 1px solid transparent;
     white-space: nowrap;
@@ -912,6 +933,62 @@ footer {
     border-color: rgba(74,222,128,.35);
 }
 
+/* Custom badges (with descriptions) */
+.badge-prof-zager {
+    background: rgba(251,113,133,.1);
+    color: #fb7185;
+    border-color: rgba(251,113,133,.35);
+}
+.badge-1-homegirl {
+    background: rgba(255,107,107,.12);
+    color: #ff6b6b;
+    border-color: rgba(255,107,107,.35);
+}
+
+.badge-nummer-1-mama {
+    background: rgba(244,114,182,.1);
+    color: #f472b6;
+    border-color: rgba(244,114,182,.35);
+}
+
+.badge-chernobly-tester {
+    background: rgba(163,230,53,.1);
+    color: #a3e635;
+    border-color: rgba(163,230,53,.35);
+}
+
+.badge-langste-niet-ai-post-owner {
+    background: rgba(34,211,238,.1);
+    color: #22d3ee;
+    border-color: rgba(34,211,238,.35);
+}
+
+.badge-grappige-spast {
+    background: rgba(235,60,255,.1);
+    color: #e040fb;
+    border-color: rgba(235,60,255,.35);
+}
+
+.badge-prof-website-breker {
+    background: rgba(255,0,0,.1);
+    color: #ff5555;
+    border-color: rgba(255,0,0,.35);
+}
+
+[class^="badge-"]:not(.badge-owner):not(.badge-admin):not(.badge-member):not(.badge-vip):not(.badge-contributor):not(.badge-co-owner):not(.badge-moderator) {
+    background: rgba(129,140,248,.1);
+    color: #818cf8;
+    border-color: rgba(129,140,248,.35);
+}
+
+.member-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+/* === MEMBERS === */
 .member-card {
     background: rgba(15,23,42,.75);
     backdrop-filter: blur(8px);
@@ -951,6 +1028,9 @@ footer {
     font-size: 1.1rem;
     color: #0a0f1e;
     flex-shrink: 0;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
 }
 
 .member-card-name {
@@ -965,12 +1045,6 @@ footer {
     margin-top: 2px;
 }
 
-.member-badges {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-}
-
 .member-card-bio {
     color: #64748b;
     font-size: .85rem;
@@ -982,6 +1056,7 @@ footer {
     -webkit-box-orient: vertical;
 }
 
+/* === PROFILE VIEW === */
 .profile-view {
     background: rgba(15,23,42,.8);
     backdrop-filter: blur(12px);
@@ -1015,6 +1090,7 @@ footer {
     font-size: 2rem;
     color: #0a0f1e;
     border: 3px solid rgba(96,165,250,.2);
+    overflow: hidden;
 }
 
 .profile-info h2 {
@@ -1072,6 +1148,7 @@ footer {
     padding-top: 16px;
 }
 
+/* === ADMIN === */
 .admin-member-card {
     background: rgba(15,23,42,.75);
     backdrop-filter: blur(8px);
@@ -1128,6 +1205,7 @@ footer {
     width: 140px;
 }
 
+/* === PROFILE EDIT === */
 .profile-edit-row {
     display: flex;
     flex-direction: column;
@@ -1161,53 +1239,7 @@ footer {
     box-shadow: 0 0 0 3px rgba(96,165,250,.12);
 }
 
-.badge-prof-zager {
-    background: rgba(251,113,133,.1);
-    color: #fb7185;
-    border-color: rgba(251,113,133,.35);
-}
-.badge-1-homegirl {
-    background: rgba(255, 107, 107, .12);
-    color: #ff6b6b;
-    border-color: rgba(255, 107, 107, .35);
-}
-
-.badge-nummer-1-mama {
-    background: rgba(244,114,182,.1);
-    color: #f472b6;
-    border-color: rgba(244,114,182,.35);
-}
-
-.badge-chernobly-tester {
-    background: rgba(163,230,53,.1);
-    color: #a3e635;
-    border-color: rgba(163,230,53,.35);
-}
-
-.badge-langste-niet-ai-post-owner {
-    background: rgba(34,211,238,.1);
-    color: #22d3ee;
-    border-color: rgba(34,211,238,.35);
-}
-
-.badge-grappige-spast {
-    background: rgba(235,60,255,.1);
-    color: #e040fb;
-    border-color: rgba(235,60,255,.35);
-}
-
-.badge-prof-website-breker {
-    background: rgba(255,0,0,.1);
-    color: #ff5555;
-    border-color: rgba(255,0,0,.35);
-}
-
-[class^="badge-"]:not(.badge-owner):not(.badge-admin):not(.badge-member):not(.badge-vip):not(.badge-contributor):not(.badge-co-owner):not(.badge-moderator) {
-    background: rgba(129,140,248,.1);
-    color: #818cf8;
-    border-color: rgba(129,140,248,.35);
-}
-
+/* === COMMENTS === */
 .comments-section {
     border-top: 1px solid rgba(51,65,85,.4);
     padding-top: 14px;
@@ -1274,6 +1306,9 @@ footer {
     font-size: .7rem;
     color: #0a0f1e;
     flex-shrink: 0;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
 }
 
 .comment-date {
@@ -1326,12 +1361,178 @@ footer {
     box-shadow: 0 0 0 3px rgba(96,165,250,.1);
 }
 
+.comment-edited-label {
+    color: #475569;
+    font-size: 0.7rem;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* === AVATAR UPLOAD === */
+.avatar-upload {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #334155;
+    flex-shrink: 0;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.upload-status {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+/* === POST IMAGE UPLOAD === */
+.image-upload-area {
+    border: 2px dashed #334155;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    background: rgba(10,15,30,0.3);
+}
+
+.image-upload-area:hover,
+.image-upload-area.dragover {
+    border-color: #60a5fa;
+}
+
+.image-upload-area input[type="file"] {
+    display: none;
+}
+
+.image-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.image-preview-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #334155;
+}
+
+.image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-preview-item .remove-image {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.6);
+    color: #f87171;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.image-preview-item .remove-image:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+/* === POST CARD IMAGES === */
+.post-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.post-images img {
+    max-height: 150px;
+    max-width: 100%;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    object-fit: cover;
+}
+
+/* === TOOLTIP === */
+.tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    max-width: 280px;
+    white-space: normal;
+    word-wrap: break-word;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+    transform: translateX(-50%) translateY(4px);
+}
+
+.tooltip.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* === COMMENT EDIT FORM === */
+.comment-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.comment-edit-form textarea {
+    background: rgba(10,15,30,0.7);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 0.875rem;
+    resize: vertical;
+}
+
+.comment-edit-form .editor-actions {
+    justify-content: flex-start;
+}
+
+/* === RESPONSIVE === */
 @media (max-width: 768px) {
     body::before { display: none; }
 
     .header-inner {
         padding: 0 16px;
         height: 56px;
+        min-height: 56px;
         gap: 12px;
     }
 
@@ -1414,6 +1615,7 @@ footer {
     .navbar a, .navbar button { font-size: .75rem; padding: 4px 7px; }
 }
 
+/* === ANIMATIONS === */
 @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -1428,222 +1630,10 @@ footer {
     from { transform: translateY(0); }
     to   { transform: translateY(-800px); }
 }
+
+/* === CUSTOM BADGE === */
 .badge-custom {
     background: rgba(129,140,248,.1);
     color: #818cf8;
     border: 1px solid rgba(129,140,248,.35);
-}
-
-/* ---- Avatar upload ---- */
-.avatar-upload {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.avatar-preview {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #334155;
-  flex-shrink: 0;
-}
-
-.avatar-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.upload-status {
-  font-size: 0.85rem;
-  color: #94a3b8;
-  margin-top: 4px;
-}
-
-/* ---- Post image upload ---- */
-.image-upload-area {
-  border: 2px dashed #334155;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s;
-  background: rgba(10,15,30,0.3);
-}
-
-.image-upload-area:hover,
-.image-upload-area.dragover {
-  border-color: #60a5fa;
-}
-
-.image-upload-area input[type="file"] {
-  display: none;
-}
-
-.image-preview-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.image-preview-item {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #334155;
-}
-
-.image-preview-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.image-preview-item .remove-image {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(0,0,0,0.6);
-  color: #f87171;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
-  text-align: center;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
-}
-
-.image-preview-item .remove-image:hover {
-  background: #ef4444;
-  color: #fff;
-}
-
-/* ---- Post card images ---- */
-.post-images {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.post-images img {
-  max-height: 150px;
-  max-width: 100%;
-  border-radius: 6px;
-  border: 1px solid #334155;
-  object-fit: cover;
-}
-
-/* ---- Tooltips ---- */
-.tooltip {
-  position: fixed;
-  pointer-events: none;
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  max-width: 280px;               
-  white-space: normal;            
-  word-wrap: break-word;          
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  z-index: 999;
-  opacity: 0;
-  transition: opacity 0.15s ease, transform 0.1s ease;
-  transform: translateX(-50%) translateY(4px); /* center horizontally */
-}
-
-.tooltip.visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* ---- Edit comment inline ---- */
-.comment-edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.comment-edit-form textarea {
-  background: rgba(10,15,30,0.7);
-  border: 1px solid #334155;
-  border-radius: 8px;
-  color: #e2e8f0;
-  padding: 8px 12px;
-  font-family: inherit;
-  font-size: 0.875rem;
-  resize: vertical;
-}
-
-.comment-edit-form .editor-actions {
-  justify-content: flex-start;
-}
-
-.comment-edited-label {
-  color: #475569;
-  font-size: 0.7rem;
-  font-style: italic;
-  margin-left: 8px;
-}
-/* === iOS safe area support === */
-body {
-    padding-top: env(safe-area-inset-top, 20px);
-    padding-left: env(safe-area-inset-left, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Also push the header down */
-header {
-    padding-top: env(safe-area-inset-top, 20px);
-    position: sticky;
-    top: 0;
-    z-index: 200;
-}
-
-/* Ensure the main content doesn't get hidden */
-main {
-    padding-top: calc(env(safe-area-inset-top, 20px) + 20px);
-}
-header {
-    position: sticky;
-    top: 0;
-    z-index: 200;
-    background: rgba(10,15,30,.9);
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(51,65,85,.6);
-    padding-top: env(safe-area-inset-top, 20px);  /* ← pushes down from status bar */
-}
-
-.header-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0 28px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    min-height: 64px; /* ensures it doesn't shrink */
-}
-
-.titel {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #fbbf24;
-    white-space: nowrap;
-    flex-shrink: 0;
-    line-height: 1; /* prevent extra spacing */
 }
