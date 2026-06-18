@@ -71,7 +71,7 @@
 </header>
 
 <main>
-    <!-- AUTH SCREEN (log in met superbase) -->
+    <!-- AUTH SCREEN -->
     <section class="auth-box" id="authBox">
         <div class="auth-logo">✦</div>
         <h2 id="authHeading">Sign In</h2>
@@ -131,7 +131,7 @@
             </div>
         </section>
 
-        <!-- COMMUNITY TAB (als 2 de in rij dus niet deze volgorde)-->
+        <!-- COMMUNITY TAB -->
         <section class="hidden" id="communityTab">
             <div class="community-subnav">
                 <button class="subnav-btn active" data-subview="feed"><span class="subnav-icon">🔥</span> Feed</button>
@@ -151,10 +151,22 @@
                 <button class="btn btn-primary hidden" id="editProfileBtn">Edit Profile</button>
             </div>
             <div class="profile-view hidden" id="profileEditView">
-                <button class="btn btn-back" id="profileEditBackBtn">← Back</button><h2 class="section-heading">Edit Profile</h2>
+                <button class="btn btn-back" id="profileEditBackBtn">← Back</button>
+                <h2 class="section-heading">Edit Profile</h2>
                 <div class="profile-edit-row"><label for="editDisplayName">Display Name</label><input type="text" id="editDisplayName"></div>
                 <div class="profile-edit-row"><label for="editUsername">Username</label><input type="text" id="editUsername"></div>
                 <div class="profile-edit-row"><label for="editBio">Bio</label><textarea id="editBio" rows="5"></textarea></div>
+                <!-- Avatar upload -->
+                <div class="profile-edit-row">
+                    <label>Profile Picture</label>
+                    <div class="avatar-upload">
+                        <div class="avatar-preview" id="avatarPreview">
+                            <img id="avatarPreviewImg" src="" alt="Avatar preview" />
+                        </div>
+                        <input type="file" id="avatarInput" accept="image/*" />
+                        <div id="avatarUploadStatus" class="upload-status"></div>
+                    </div>
+                </div>
                 <div class="auth-error hidden" id="profileEditError"></div>
                 <div class="editor-actions"><button class="btn btn-primary" id="saveProfileBtn">Save</button></div>
             </div>
@@ -163,6 +175,16 @@
                 <label for="postTitleInput">Title</label><input type="text" id="postTitleInput" placeholder="What's this about?">
                 <label for="postCategoryInput">Category</label><select id="postCategoryInput"><option value="Discussion">Discussion</option><option value="Announcement">Announcement</option><option value="Event">Event</option><option value="Idea">Idea</option></select>
                 <label for="postContentInput">Content</label><textarea id="postContentInput" rows="8" placeholder="Share something with the community..."></textarea>
+                <!-- Image upload for posts -->
+                <div class="editor-row">
+                    <label>Images</label>
+                    <div class="image-upload-area" id="postImageDropArea">
+                        <p>Drag & drop images here or click to browse</p>
+                        <input type="file" id="postImageInput" accept="image/*" multiple />
+                        <div class="image-preview-grid" id="postImagePreviews"></div>
+                    </div>
+                    <div id="postImageUploadStatus" class="upload-status"></div>
+                </div>
                 <div class="editor-actions"><button class="btn btn-primary" id="savePostBtn">Post</button><button class="btn" id="cancelPostBtn">Cancel</button></div>
             </div>
         </section>
@@ -171,6 +193,9 @@
 
 <footer><p>© 2026 The Zero Company</p></footer>
 <div class="dropdown-overlay hidden" id="dropdownOverlay"></div>
+
+<!-- Tooltip container -->
+<div id="tooltip" class="tooltip hidden"></div>
 
 </body>
 </html>
