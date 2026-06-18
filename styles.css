@@ -1597,3 +1597,23 @@ footer {
   font-style: italic;
   margin-left: 8px;
 }
+/* === iOS safe area support === */
+body {
+    padding-top: env(safe-area-inset-top, 20px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Also push the header down */
+header {
+    padding-top: env(safe-area-inset-top, 20px);
+    position: sticky;
+    top: 0;
+    z-index: 200;
+}
+
+/* Ensure the main content doesn't get hidden */
+main {
+    padding-top: calc(env(safe-area-inset-top, 20px) + 20px);
+}
