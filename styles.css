@@ -1553,18 +1553,19 @@ footer {
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 0.8rem;
-  max-width: 240px;
-  white-space: nowrap;
+  max-width: 280px;               
+  white-space: normal;            
+  word-wrap: break-word;          
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   z-index: 999;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.1s ease;
-  transform: translateY(4px);
+  transform: translateX(-50%) translateY(4px); /* center horizontally */
 }
 
 .tooltip.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ---- Edit comment inline ---- */
