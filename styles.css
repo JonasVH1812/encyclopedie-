@@ -1428,3 +1428,166 @@ footer {
     color: #818cf8;
     border: 1px solid rgba(129,140,248,.35);
 }
+
+/* ---- Avatar upload ---- */
+.avatar-upload {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #334155;
+  flex-shrink: 0;
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-status {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* ---- Post image upload ---- */
+.image-upload-area {
+  border: 2px dashed #334155;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  background: rgba(10,15,30,0.3);
+}
+
+.image-upload-area:hover,
+.image-upload-area.dragover {
+  border-color: #60a5fa;
+}
+
+.image-upload-area input[type="file"] {
+  display: none;
+}
+
+.image-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.image-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-preview-item .remove-image {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #f87171;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.image-preview-item .remove-image:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ---- Post card images ---- */
+.post-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.post-images img {
+  max-height: 150px;
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  object-fit: cover;
+}
+
+/* ---- Tooltips ---- */
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  max-width: 240px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  transform: translateY(4px);
+}
+
+.tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---- Edit comment inline ---- */
+.comment-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.comment-edit-form textarea {
+  background: rgba(10,15,30,0.7);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.comment-edit-form .editor-actions {
+  justify-content: flex-start;
+}
+
+.comment-edited-label {
+  color: #475569;
+  font-size: 0.7rem;
+  font-style: italic;
+  margin-left: 8px;
+}
