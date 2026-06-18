@@ -212,15 +212,38 @@ function isOwnerUser(profile) {
 function updateAccountUI() {
     if (!currentProfile) return;
     const initial = getInitial(currentProfile.display_name || currentProfile.username);
-    if (accountAvatar) accountAvatar.textContent = initial;
-    if (accountDropdownAvatar) accountDropdownAvatar.textContent = initial;
+
+    // --- Top‑right account avatar ---
+    if (accountAvatar) {
+        if (currentProfile.avatar_url) {
+            accountAvatar.style.backgroundImage = `url(${currentProfile.avatar_url})`;
+            accountAvatar.style.backgroundSize = 'cover';
+            accountAvatar.style.backgroundPosition = 'center';
+            accountAvatar.textContent = '';   // remove initials
+        } else {
+            accountAvatar.style.backgroundImage = 'none';
+            accountAvatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
+            accountAvatar.textContent = initial;
+        }
+    }
+
+    // --- Dropdown avatar (same logic) ---
+    if (accountDropdownAvatar) {
+        if (currentProfile.avatar_url) {
+            accountDropdownAvatar.style.backgroundImage = `url(${currentProfile.avatar_url})`;
+            accountDropdownAvatar.style.backgroundSize = 'cover';
+            accountDropdownAvatar.style.backgroundPosition = 'center';
+            accountDropdownAvatar.textContent = '';
+        } else {
+            accountDropdownAvatar.style.backgroundImage = 'none';
+            accountDropdownAvatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
+            accountDropdownAvatar.textContent = initial;
+        }
+    }
+
+    // Name & role
     if (accountDropdownName) accountDropdownName.textContent = currentProfile.display_name || currentProfile.username;
     if (accountDropdownRole) accountDropdownRole.textContent = currentProfile.role || "Member";
-    // Update avatar preview if available
-    if (currentProfile.avatar_url) {
-        const img = document.getElementById('avatarPreviewImg');
-        if (img) img.src = currentProfile.avatar_url;
-    }
 }
 
 function showMainMenu() {
