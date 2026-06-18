@@ -145,6 +145,10 @@ const accountMainMenu       = document.getElementById("accountMainMenu");
 const accountSettingsMenu   = document.getElementById("accountSettingsMenu");
 const dropdownOverlay       = document.getElementById("dropdownOverlay");
 
+// --- Tooltip elements ---
+const tooltipEl = document.getElementById("tooltip");
+let tooltipTimeout = null;
+
 function formatDate(ts) {
     const d = new Date(ts);
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
@@ -184,6 +188,7 @@ function renderBadges(container, profile) {
     const roleBadge = document.createElement("span");
     roleBadge.className = badgeClass(role);
     roleBadge.textContent = role;
+    roleBadge.dataset.tooltip = role;
     container.appendChild(roleBadge);
 
     const tags = Array.isArray(profile.extra_tags) ? profile.extra_tags : [];
@@ -191,11 +196,11 @@ function renderBadges(container, profile) {
         const span = document.createElement("span");
         span.className = badgeClass(tag);
         span.textContent = tag;
-        // Add tooltip from description map
-        span.title = BADGE_DESCRIPTIONS[tag] || '';
+        span.dataset.tooltip = BADGE_DESCRIPTIONS[tag] || tag;
         container.appendChild(span);
     });
 }
+
 function isAdminOrOwner(profile) {
     return profile && (profile.role === "Owner" || profile.role === "Admin");
 }
@@ -211,6 +216,11 @@ function updateAccountUI() {
     if (accountDropdownAvatar) accountDropdownAvatar.textContent = initial;
     if (accountDropdownName) accountDropdownName.textContent = currentProfile.display_name || currentProfile.username;
     if (accountDropdownRole) accountDropdownRole.textContent = currentProfile.role || "Member";
+    // Update avatar preview if available
+    if (currentProfile.avatar_url) {
+        const img = document.getElementById('avatarPreviewImg');
+        if (img) img.src = currentProfile.avatar_url;
+    }
 }
 
 function showMainMenu() {
@@ -580,6 +590,205 @@ document.querySelectorAll(".subnav-btn").forEach(btn =>
     btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview))
 );
 
+// ============================================================
+// NEW: Image compression helper (Canvas)
+// ============================================================
+
+async function compressImage(file, maxWidth = 1200, quality = 0.8, type = 'image/webp') {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = (height / width) * maxWidth;
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error('Compression failed'));
+                }, type, quality);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ============================================================
+// NEW: Upload image to storage
+// ============================================================
+
+async function uploadImage(file, bucket, folder, fileName) {
+    const path = `${folder}/${fileName}`;
+    const { data, error } = await sb.storage
+        .from(bucket)
+        .upload(path, file, { upsert: true });
+    if (error) throw error;
+    const { data: urlData } = sb.storage.from(bucket).getPublicUrl(path);
+    return urlData.publicUrl;
+}
+
+// ============================================================
+// NEW: Profile picture upload
+// ============================================================
+
+const avatarInput = document.getElementById('avatarInput');
+const avatarPreviewImg = document.getElementById('avatarPreviewImg');
+const avatarUploadStatus = document.getElementById('avatarUploadStatus');
+
+avatarInput?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    avatarUploadStatus.textContent = 'Compressing...';
+    try {
+        const compressedBlob = await compressImage(file, 800, 0.85);
+        const ext = file.name.split('.').pop() || 'jpg';
+        const fileName = `avatar.${ext}`;
+        const url = await uploadImage(
+            compressedBlob,
+            'profile-pictures',
+            currentUser.id,
+            fileName
+        );
+        avatarPreviewImg.src = url;
+        avatarUploadStatus.textContent = '✓ Uploaded';
+        // Save to profile
+        const { error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', currentUser.id);
+        if (error) throw error;
+        currentProfile.avatar_url = url;
+        updateAccountUI();
+        // Update profile view if open
+        if (viewingProfileId === currentUser.id) {
+            await openProfile(currentUser.id);
+        }
+    } catch (err) {
+        avatarUploadStatus.textContent = '❌ Upload failed: ' + err.message;
+        console.error(err);
+    }
+});
+
+// ============================================================
+// NEW: Post image upload (multiple)
+// ============================================================
+
+let postImageFiles = []; // store URLs of uploaded images
+
+const postImageInput = document.getElementById('postImageInput');
+const postImageDropArea = document.getElementById('postImageDropArea');
+const postImagePreviews = document.getElementById('postImagePreviews');
+const postImageUploadStatus = document.getElementById('postImageUploadStatus');
+
+// Click to upload
+postImageDropArea?.addEventListener('click', () => postImageInput.click());
+
+// Drag & drop
+postImageDropArea?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    postImageDropArea.classList.add('dragover');
+});
+postImageDropArea?.addEventListener('dragleave', () => {
+    postImageDropArea.classList.remove('dragover');
+});
+postImageDropArea?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    postImageDropArea.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length) await handlePostImageFiles(files);
+});
+
+postImageInput?.addEventListener('change', async (e) => {
+    if (e.target.files.length) await handlePostImageFiles(e.target.files);
+});
+
+async function handlePostImageFiles(fileList) {
+    postImageUploadStatus.textContent = 'Compressing...';
+    const files = Array.from(fileList);
+    const total = files.length;
+    let uploaded = 0;
+    for (const file of files) {
+        try {
+            const compressed = await compressImage(file, 1200, 0.8);
+            const ext = file.name.split('.').pop() || 'jpg';
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+            const url = await uploadImage(
+                compressed,
+                'community-posts',
+                currentUser.id,
+                fileName
+            );
+            // Store the URL and preview
+            postImageFiles.push(url);
+            addPostImagePreview(url);
+            uploaded++;
+            postImageUploadStatus.textContent = `Uploaded ${uploaded}/${total}`;
+        } catch (err) {
+            console.error('Image upload error:', err);
+            postImageUploadStatus.textContent = `❌ Failed: ${err.message}`;
+        }
+    }
+    if (uploaded === total) postImageUploadStatus.textContent = '✓ All images uploaded';
+}
+
+function addPostImagePreview(url) {
+    const container = document.createElement('div');
+    container.className = 'image-preview-item';
+    const img = document.createElement('img');
+    img.src = url;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-image';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = postImageFiles.indexOf(url);
+        if (idx > -1) {
+            postImageFiles.splice(idx, 1);
+            container.remove();
+        }
+    });
+    container.append(img, removeBtn);
+    postImagePreviews.appendChild(container);
+}
+
+// When editing a post, load existing images
+function loadPostImages(imageUrls) {
+    postImagePreviews.innerHTML = '';
+    postImageFiles = imageUrls ? [...imageUrls] : [];
+    postImageFiles.forEach(url => addPostImagePreview(url));
+}
+
+// ============================================================
+// NEW: Post editing permissions
+// ============================================================
+
+function canEditPost(post) {
+    if (!currentUser) return false;
+    if (post.user_id === currentUser.id) return true;
+    const role = currentProfile?.role;
+    return role === 'Admin' || role === 'Owner';
+}
+
+function canEditComment(comment) {
+    if (!currentUser) return false;
+    if (comment.user_id === currentUser.id) return true;
+    const role = currentProfile?.role;
+    return role === 'Admin' || role === 'Owner';
+}
+
+// ============================================================
+// RENDER FEED (updated)
+// ============================================================
+
 async function renderFeed() {
     postsList.innerHTML = "";
     const loading = document.createElement("div");
@@ -617,7 +826,11 @@ async function renderFeed() {
     posts.forEach(post => buildPostCard(post, postsList));
 }
 
-function buildPostCard(post, container) {
+// ============================================================
+// BUILD POST CARD (updated with images, edit, tooltips)
+// ============================================================
+
+async function buildPostCard(post, container) {
     const card = document.createElement("div");
     card.className = "post-card" + (post.pinned ? " pinned" : "");
 
@@ -657,30 +870,55 @@ function buildPostCard(post, container) {
     contentP.className = "post-card-content";
     contentP.textContent = post.content;
 
+    // --- Images ---
+    const imagesDiv = document.createElement("div");
+    imagesDiv.className = "post-images";
+    if (post.images && post.images.length) {
+        post.images.forEach(url => {
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = "Post image";
+            img.loading = "lazy";
+            imagesDiv.appendChild(img);
+        });
+    }
+
     const date = document.createElement("div");
     date.className = "post-card-date";
     date.textContent = formatDate(new Date(post.created_at).getTime());
 
-    card.append(header, h3, contentP, date);
+    card.append(header, h3, contentP, imagesDiv, date);
 
+    // --- Actions ---
+    const actions = document.createElement("div");
+    actions.className = "post-card-actions";
+
+    // Edit button
+    if (canEditPost(post)) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn btn-sm";
+        editBtn.textContent = "✎ Edit";
+        editBtn.addEventListener("click", () => openPostEditorForEdit(post));
+        actions.appendChild(editBtn);
+    }
+
+    // Pin (Admin/Owner)
+    if (isAdminOrOwner(currentProfile)) {
+        const pinBtn = document.createElement("button");
+        pinBtn.className = "btn btn-sm btn-pin";
+        pinBtn.textContent = post.pinned ? "Unpin" : "📌 Pin";
+        pinBtn.addEventListener("click", async () => {
+            pinBtn.disabled = true;
+            await togglePin(post.id, !post.pinned);
+        });
+        actions.appendChild(pinBtn);
+    }
+
+    // Delete
     if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
-        const actions = document.createElement("div");
-        actions.className = "post-card-actions";
-
-        if (isAdminOrOwner(currentProfile)) {
-            const pinBtn = document.createElement("button");
-            pinBtn.className = "btn btn-sm btn-pin";
-            pinBtn.textContent = post.pinned ? "Unpin post" : "📌 Pin post";
-            pinBtn.addEventListener("click", async () => {
-                pinBtn.disabled = true;
-                await togglePin(post.id, !post.pinned);
-            });
-            actions.appendChild(pinBtn);
-        }
-
         const delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger btn-sm";
-        delBtn.textContent = "Delete post";
+        delBtn.textContent = "Delete";
         delBtn.addEventListener("click", () => {
             let confirmBar = card.querySelector(".delete-confirm");
             if (confirmBar) return confirmBar.remove();
@@ -709,9 +947,11 @@ function buildPostCard(post, container) {
             actions.appendChild(confirmBar);
         });
         actions.appendChild(delBtn);
-        card.appendChild(actions);
     }
 
+    if (actions.children.length) card.appendChild(actions);
+
+    // --- Comments section ---
     const commentsSection = document.createElement("div");
     commentsSection.className = "comments-section";
 
@@ -786,6 +1026,10 @@ function buildPostCard(post, container) {
     container.appendChild(card);
 }
 
+// ============================================================
+// LOAD COMMENTS (updated with edit, delete, "edited" label)
+// ============================================================
+
 async function loadComments(postId, listEl) {
     listEl.innerHTML = `<div class="comment-loading">Loading...</div>`;
 
@@ -833,6 +1077,13 @@ async function loadComments(postId, listEl) {
         dateSpan.className = "comment-date";
         dateSpan.textContent = formatDate(new Date(comment.created_at).getTime());
 
+        if (comment.updated_at && new Date(comment.updated_at).getTime() > new Date(comment.created_at).getTime()) {
+            const editedSpan = document.createElement("span");
+            editedSpan.className = "comment-edited-label";
+            editedSpan.textContent = "(edited)";
+            dateSpan.appendChild(editedSpan);
+        }
+
         commentHeader.append(avatar, authorLink, badges, dateSpan);
 
         const body = document.createElement("div");
@@ -840,6 +1091,59 @@ async function loadComments(postId, listEl) {
         body.textContent = comment.content;
 
         el.append(commentHeader, body);
+
+        // Actions
+        const actions = document.createElement("div");
+        actions.className = "post-card-actions";
+        actions.style.marginTop = "8px";
+
+        if (canEditComment(comment)) {
+            const editBtn = document.createElement("button");
+            editBtn.className = "btn btn-sm";
+            editBtn.textContent = "✎ Edit";
+            editBtn.addEventListener("click", () => {
+                const editForm = document.createElement("div");
+                editForm.className = "comment-edit-form";
+                const textarea = document.createElement("textarea");
+                textarea.value = comment.content;
+                textarea.rows = 3;
+                const saveEditBtn = document.createElement("button");
+                saveEditBtn.className = "btn btn-primary btn-sm";
+                saveEditBtn.textContent = "Save";
+                const cancelEditBtn = document.createElement("button");
+                cancelEditBtn.className = "btn btn-sm";
+                cancelEditBtn.textContent = "Cancel";
+                const actionsRow = document.createElement("div");
+                actionsRow.className = "editor-actions";
+                actionsRow.append(saveEditBtn, cancelEditBtn);
+                editForm.append(textarea, actionsRow);
+
+                el.replaceChild(editForm, body);
+                textarea.focus();
+
+                saveEditBtn.addEventListener("click", async () => {
+                    const newContent = textarea.value.trim();
+                    if (!newContent) return;
+                    saveEditBtn.disabled = true;
+                    saveEditBtn.textContent = "Saving...";
+                    const { error } = await sb.from("post_comments")
+                        .update({ content: newContent, updated_at: new Date().toISOString() })
+                        .eq("id", comment.id);
+                    saveEditBtn.disabled = false;
+                    saveEditBtn.textContent = "Save";
+                    if (error) {
+                        alert("Could not update comment: " + error.message);
+                        return;
+                    }
+                    await loadComments(postId, listEl);
+                });
+
+                cancelEditBtn.addEventListener("click", () => {
+                    loadComments(postId, listEl);
+                });
+            });
+            actions.appendChild(editBtn);
+        }
 
         if (comment.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
             const delBtn = document.createElement("button");
@@ -875,12 +1179,17 @@ async function loadComments(postId, listEl) {
                 confirmBar.append(text, yesBtn, noBtn);
                 el.appendChild(confirmBar);
             });
-            commentHeader.appendChild(delBtn);
+            actions.appendChild(delBtn);
         }
 
+        if (actions.children.length) el.appendChild(actions);
         listEl.appendChild(el);
     });
 }
+
+// ============================================================
+// TOGGLE PIN, DELETE POST
+// ============================================================
 
 async function togglePin(postId, pinned) {
     const { error } = await sb.from("community_posts").update({ pinned }).eq("id", postId);
@@ -896,17 +1205,33 @@ async function deletePost(postId) {
     renderFeed();
 }
 
+// ============================================================
+// NEW POST / EDIT POST
+// ============================================================
+
 newPostBtn.addEventListener("click", () => {
     postTitleInput.value = "";
     postCategoryInput.value = "Discussion";
     postContentInput.value = "";
+    postImageFiles = [];
+    postImagePreviews.innerHTML = "";
+    postImageUploadStatus.textContent = "";
+    postEditor.dataset.editPostId = '';
+    savePostBtn.textContent = 'Post';
+    savePostBtn.onclick = createNewPost;
+    document.querySelector('#postEditor h2').textContent = 'New Post';
     showCommunitySection(postEditor);
     postTitleInput.focus();
 });
 
-cancelPostBtn.addEventListener("click", () => showCommunitySection(communityFeed));
+cancelPostBtn.addEventListener("click", () => {
+    postEditor.dataset.editPostId = '';
+    savePostBtn.textContent = 'Post';
+    savePostBtn.onclick = createNewPost;
+    showCommunitySection(communityFeed);
+});
 
-savePostBtn.addEventListener("click", async () => {
+async function createNewPost() {
     const title = postTitleInput.value.trim();
     if (!title) return;
 
@@ -918,7 +1243,8 @@ savePostBtn.addEventListener("click", async () => {
             user_id: currentUser.id,
             title,
             category: postCategoryInput.value,
-            content: postContentInput.value.trim()
+            content: postContentInput.value.trim(),
+            images: postImageFiles.length ? postImageFiles : null
         });
         if (error) throw error;
 
@@ -930,7 +1256,60 @@ savePostBtn.addEventListener("click", async () => {
         savePostBtn.disabled = false;
         savePostBtn.textContent = "Post";
     }
-});
+}
+
+async function openPostEditorForEdit(post) {
+    showCommunitySection(postEditor);
+    document.querySelector('#postEditor h2').textContent = 'Edit Post';
+    postTitleInput.value = post.title;
+    postCategoryInput.value = post.category;
+    postContentInput.value = post.content;
+    loadPostImages(post.images || []);
+    postEditor.dataset.editPostId = post.id;
+    savePostBtn.textContent = 'Update Post';
+    savePostBtn.onclick = async () => {
+        await updatePost(post.id);
+    };
+}
+
+async function updatePost(postId) {
+    const title = postTitleInput.value.trim();
+    if (!title) return;
+
+    savePostBtn.disabled = true;
+    savePostBtn.textContent = 'Updating...';
+
+    try {
+        const { error } = await sb.from('community_posts')
+            .update({
+                title,
+                category: postCategoryInput.value,
+                content: postContentInput.value.trim(),
+                images: postImageFiles.length ? postImageFiles : null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', postId);
+        if (error) throw error;
+
+        postEditor.dataset.editPostId = '';
+        savePostBtn.textContent = 'Post';
+        savePostBtn.onclick = createNewPost;
+        showCommunitySection(communityFeed);
+        await renderFeed();
+    } catch (err) {
+        alert("Could not update: " + (err.message || "unknown error"));
+    } finally {
+        savePostBtn.disabled = false;
+        savePostBtn.textContent = 'Update Post';
+    }
+}
+
+// Set default save button handler
+savePostBtn.onclick = createNewPost;
+
+// ============================================================
+// MEMBERS & PROFILE (unchanged, but openProfile now shows avatar)
+// ============================================================
 
 async function fetchMembers() {
     const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
@@ -1027,7 +1406,27 @@ async function openProfile(userId) {
     const idx = members.findIndex(m => m.id === userId);
     if (idx !== -1) members[idx] = profile;
 
-    profileAvatar.textContent = getInitial(profile.display_name || profile.username);
+    // Avatar: if available, show image; else initial
+    const avatarContainer = profileAvatar;
+    avatarContainer.innerHTML = '';
+    if (profile.avatar_url) {
+        const img = document.createElement('img');
+        img.src = profile.avatar_url;
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '50%';
+        avatarContainer.appendChild(img);
+    } else {
+        avatarContainer.textContent = getInitial(profile.display_name || profile.username);
+        avatarContainer.style.display = 'flex';
+        avatarContainer.style.alignItems = 'center';
+        avatarContainer.style.justifyContent = 'center';
+        avatarContainer.style.fontSize = '2rem';
+        avatarContainer.style.fontWeight = '700';
+        avatarContainer.style.color = '#0a0f1e';
+    }
+
     profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
     profileUsername.textContent = "@" + (profile.username || "unknown");
     renderBadges(profileBadges, profile);
@@ -1051,6 +1450,10 @@ editProfileBtn.addEventListener("click", () => {
     editDisplayName.value = currentProfile.display_name || "";
     editUsername.value    = currentProfile.username || "";
     editBio.value         = currentProfile.bio || "";
+    // Load avatar preview
+    if (currentProfile.avatar_url) {
+        document.getElementById('avatarPreviewImg').src = currentProfile.avatar_url;
+    }
     profileEditError.classList.add("hidden");
     showCommunitySection(profileEditView);
 });
@@ -1091,6 +1494,10 @@ saveProfileBtn.addEventListener("click", async () => {
     updateAccountUI();
     await openProfile(currentUser.id);
 });
+
+// ============================================================
+// ADMIN PANEL (unchanged)
+// ============================================================
 
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
@@ -1341,6 +1748,10 @@ function renderAdminCard(member, isOwner) {
     adminMembersList.appendChild(card);
 }
 
+// ============================================================
+// PAGE FUNCTIONS (unchanged)
+// ============================================================
+
 function openPage(id) {
     const p = pages.find(pg => pg.id === id);
     if (!p) return;
@@ -1456,5 +1867,50 @@ deleteBtn.addEventListener("click", deletePage);
 closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); });
 saveBtn.addEventListener("click", savePage);
 cancelBtn.addEventListener("click", () => currentPageId ? openPage(currentPageId) : renderHome());
+
+// ============================================================
+// TOOLTIP SYSTEM
+// ============================================================
+
+function showTooltip(e, text) {
+    if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = null;
+    }
+    tooltipEl.textContent = text;
+    const rect = e.target.getBoundingClientRect();
+    tooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
+    tooltipEl.style.top = (rect.top - 10) + 'px';
+    tooltipEl.style.transform = 'translateX(-50%) translateY(-100%)';
+    tooltipEl.classList.add('visible');
+    tooltipEl.classList.remove('hidden');
+}
+
+function hideTooltip() {
+    if (tooltipTimeout) clearTimeout(tooltipTimeout);
+    tooltipTimeout = setTimeout(() => {
+        tooltipEl.classList.remove('visible');
+        tooltipEl.classList.add('hidden');
+        tooltipTimeout = null;
+    }, 150);
+}
+
+document.addEventListener('mouseover', (e) => {
+    const target = e.target.closest('[data-tooltip]');
+    if (target) {
+        const text = target.dataset.tooltip || target.textContent;
+        showTooltip(e, text);
+    }
+});
+document.addEventListener('mouseout', (e) => {
+    const target = e.target.closest('[data-tooltip]');
+    if (target) {
+        hideTooltip();
+    }
+});
+
+// ============================================================
+// INIT
+// ============================================================
 
 setAuthMode("signin");
