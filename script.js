@@ -1331,7 +1331,7 @@ async function updatePost(postId) {
 savePostBtn.onclick = createNewPost;
 
 // ============================================================
-// MEMBERS & PROFILE (unchanged, but openProfile now shows avatar)
+// MEMBERS & PROFILE (with avatar support)
 // ============================================================
 
 async function fetchMembers() {
@@ -1347,6 +1347,7 @@ async function fetchStats() {
     (data || []).forEach(row => profileStatsMap[row.id] = row);
 }
 
+// --- renderMembers (with avatar) ---
 async function renderMembers() {
     membersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -1375,7 +1376,7 @@ async function renderMembers() {
     });
 
     sorted.forEach(member => {
-        const card   = document.createElement("div");
+        const card = document.createElement("div");
         card.className = "member-card";
 
         const header = document.createElement("div");
@@ -1383,10 +1384,18 @@ async function renderMembers() {
 
         const avatar = document.createElement("div");
         avatar.className = "member-avatar";
-        avatar.textContent = getInitial(member.display_name || member.username);
+        if (member.avatar_url) {
+            avatar.style.backgroundImage = `url(${member.avatar_url})`;
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.textContent = '';
+        } else {
+            avatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
+            avatar.textContent = getInitial(member.display_name || member.username);
+        }
 
         const nameWrap = document.createElement("div");
-        const name     = document.createElement("div");
+        const name = document.createElement("div");
         name.className = "member-card-name";
         name.textContent = member.display_name || member.username || "Unknown";
 
@@ -1396,14 +1405,12 @@ async function renderMembers() {
 
         nameWrap.appendChild(name);
         nameWrap.appendChild(username);
-
         header.appendChild(avatar);
         header.appendChild(nameWrap);
 
         const badges = document.createElement("div");
         badges.className = "member-badges";
         renderBadges(badges, member);
-
         card.appendChild(header);
         card.appendChild(badges);
 
@@ -1419,6 +1426,7 @@ async function renderMembers() {
     });
 }
 
+// --- openProfile ---
 async function openProfile(userId) {
     viewingProfileId = userId;
 
@@ -1429,7 +1437,6 @@ async function openProfile(userId) {
     const idx = members.findIndex(m => m.id === userId);
     if (idx !== -1) members[idx] = profile;
 
-    // Avatar: if available, show image; else initial
     const avatarContainer = profileAvatar;
     avatarContainer.innerHTML = '';
     if (profile.avatar_url) {
@@ -1473,7 +1480,6 @@ editProfileBtn.addEventListener("click", () => {
     editDisplayName.value = currentProfile.display_name || "";
     editUsername.value    = currentProfile.username || "";
     editBio.value         = currentProfile.bio || "";
-    // Load avatar preview
     if (currentProfile.avatar_url) {
         document.getElementById('avatarPreviewImg').src = currentProfile.avatar_url;
     }
@@ -1519,9 +1525,253 @@ saveProfileBtn.addEventListener("click", async () => {
 });
 
 // ============================================================
-// ADMIN PANEL (unchanged)
+// ADMIN PANEL
 // ============================================================
 
+// --- renderAdminCard (NEW) ---
+function renderAdminCard(member, isOwner) {
+    const card = document.createElement("div");
+    card.className = "admin-member-card";
+    card.dataset.memberId = member.id;
+
+    const header = document.createElement("div");
+    header.className = "admin-member-header";
+
+    const identity = document.createElement("div");
+    identity.className = "admin-member-identity";
+
+    const avatar = document.createElement("div");
+    avatar.className = "member-avatar";
+    if (member.avatar_url) {
+        avatar.style.backgroundImage = `url(${member.avatar_url})`;
+        avatar.style.backgroundSize = 'cover';
+        avatar.style.backgroundPosition = 'center';
+        avatar.textContent = '';
+    } else {
+        avatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
+        avatar.textContent = getInitial(member.display_name || member.username);
+    }
+
+    const nameWrap = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "member-card-name";
+    name.textContent = member.display_name || member.username || "Unknown";
+
+    const badges = document.createElement("div");
+    badges.className = "member-badges";
+    renderBadges(badges, member);
+
+    nameWrap.appendChild(name);
+    nameWrap.appendChild(badges);
+    identity.appendChild(avatar);
+    identity.appendChild(nameWrap);
+
+    const controls = document.createElement("div");
+    controls.className = "admin-role-controls";
+
+    const statusLabel = document.createElement("span");
+    statusLabel.className = "admin-save-status";
+    statusLabel.style.cssText = "font-size:.8rem;color:#4ade80;display:none;";
+
+    function showStatus(msg, ok = true) {
+        statusLabel.textContent = msg;
+        statusLabel.style.color = ok ? "#4ade80" : "#f87171";
+        statusLabel.style.display = "inline";
+        setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
+    }
+
+    const roleSelect = document.createElement("select");
+    const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
+    const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
+    rolesToShow.forEach(role => {
+        const opt = document.createElement("option");
+        opt.value = role;
+        opt.textContent = role;
+        if (role === member.role) opt.selected = true;
+        roleSelect.appendChild(opt);
+    });
+    const canChangeRole = isOwner && member.id !== currentUser.id;
+    if (!canChangeRole) roleSelect.disabled = true;
+
+    roleSelect.addEventListener("change", async () => {
+        const newRole = roleSelect.value;
+        const prevRole = member.role;
+        roleSelect.disabled = true;
+        const { data: saved, error } = await sb
+            .from("profiles")
+            .update({ role: newRole })
+            .eq("id", member.id)
+            .select("role, extra_tags")
+            .single();
+        roleSelect.disabled = false;
+        if (error) {
+            showStatus("❌ " + (error.message || "Save failed"), false);
+            roleSelect.value = prevRole;
+            return;
+        }
+        member.role = saved.role;
+        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
+        renderBadges(badges, member);
+        showStatus("✓ Role saved");
+        if (member.id === currentUser.id) {
+            currentProfile.role = member.role;
+            updateAccountUI();
+        }
+    });
+    controls.appendChild(roleSelect);
+
+    const tagSelect = document.createElement("select");
+    const blankOpt = document.createElement("option");
+    blankOpt.value = "";
+    blankOpt.textContent = "+ Add tag";
+    tagSelect.appendChild(blankOpt);
+
+    const canModifyTags = isOwner || (isAdminOrOwner(currentProfile) && member.role === "Member");
+    if (!canModifyTags) tagSelect.disabled = true;
+
+    function rebuildTagSelect() {
+        while (tagSelect.options.length > 1) tagSelect.remove(1);
+        TAG_OPTIONS.forEach(tag => {
+            if (!(member.extra_tags || []).includes(tag)) {
+                const opt = document.createElement("option");
+                opt.value = tag;
+                opt.textContent = tag;
+                tagSelect.appendChild(opt);
+            }
+        });
+    }
+    rebuildTagSelect();
+
+    tagSelect.addEventListener("change", async () => {
+        const tag = tagSelect.value;
+        if (!tag) return;
+        const newTags = [...(member.extra_tags || []), tag];
+        tagSelect.disabled = true;
+        const { data: saved, error } = await sb
+            .from("profiles")
+            .update({ extra_tags: newTags })
+            .eq("id", member.id)
+            .select("role, extra_tags")
+            .single();
+        tagSelect.disabled = false;
+        tagSelect.value = "";
+        if (error) {
+            showStatus("❌ " + (error.message || "Save failed"), false);
+            return;
+        }
+        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
+        renderBadges(badges, member);
+        rebuildTagSelect();
+        rebuildTagList();
+        showStatus("✓ Tag added");
+    });
+    controls.appendChild(tagSelect);
+
+    const tagListContainer = document.createElement("div");
+    tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
+
+    function rebuildTagList() {
+        tagListContainer.innerHTML = "";
+        const tags = member.extra_tags || [];
+        if (tags.length === 0) {
+            const emptyMsg = document.createElement("div");
+            emptyMsg.textContent = "No custom badges";
+            emptyMsg.style.cssText = "color:#64748b; font-size:0.75rem;";
+            tagListContainer.appendChild(emptyMsg);
+            return;
+        }
+        tags.forEach((tag, idx) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;gap:8px;";
+
+            const upBtn = document.createElement("button");
+            upBtn.textContent = "▲";
+            upBtn.className = "btn btn-sm";
+            upBtn.style.padding = "2px 6px";
+            upBtn.disabled = idx === 0 || !canModifyTags;
+            upBtn.addEventListener("click", async () => {
+                if (idx === 0 || !canModifyTags) return;
+                const newTags = [...tags];
+                [newTags[idx - 1], newTags[idx]] = [newTags[idx], newTags[idx - 1]];
+                await saveTagOrder(newTags);
+            });
+
+            const downBtn = document.createElement("button");
+            downBtn.textContent = "▼";
+            downBtn.className = "btn btn-sm";
+            downBtn.style.padding = "2px 6px";
+            downBtn.disabled = idx === tags.length - 1 || !canModifyTags;
+            downBtn.addEventListener("click", async () => {
+                if (idx === tags.length - 1 || !canModifyTags) return;
+                const newTags = [...tags];
+                [newTags[idx], newTags[idx + 1]] = [newTags[idx + 1], newTags[idx]];
+                await saveTagOrder(newTags);
+            });
+
+            const tagSpan = document.createElement("span");
+            tagSpan.textContent = tag;
+            tagSpan.className = "badge badge-custom";
+            tagSpan.style.backgroundColor = "rgba(129,140,248,.1)";
+            tagSpan.style.color = "#818cf8";
+            tagSpan.style.padding = "2px 8px";
+
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "✕";
+            removeBtn.className = "btn btn-danger btn-sm";
+            removeBtn.style.padding = "2px 6px";
+            removeBtn.disabled = !canModifyTags;
+            removeBtn.addEventListener("click", async () => {
+                if (!canModifyTags) return;
+                const newTags = tags.filter(t => t !== tag);
+                await saveTagOrder(newTags);
+            });
+
+            row.append(upBtn, downBtn, tagSpan, removeBtn);
+            tagListContainer.appendChild(row);
+        });
+    }
+
+    async function saveTagOrder(newTags) {
+        member.extra_tags = newTags;
+        renderBadges(badges, member);
+        rebuildTagList();
+        rebuildTagSelect();
+        const { error } = await sb
+            .from("profiles")
+            .update({ extra_tags: newTags })
+            .eq("id", member.id);
+        if (error) {
+            console.error("Tag reorder error:", error);
+            showStatus("❌ Failed to save order", false);
+            const { data: fresh } = await sb.from("profiles").select("*").eq("id", member.id).single();
+            if (fresh) {
+                member.extra_tags = Array.isArray(fresh.extra_tags) ? fresh.extra_tags : [];
+                renderBadges(badges, member);
+                rebuildTagList();
+                rebuildTagSelect();
+            }
+        } else {
+            showStatus("✓ Order saved");
+        }
+    }
+
+    rebuildTagList();
+    controls.appendChild(tagListContainer);
+    controls.appendChild(statusLabel);
+
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn btn-sm";
+    viewBtn.textContent = "View Profile";
+    viewBtn.addEventListener("click", () => openProfile(member.id));
+    controls.appendChild(viewBtn);
+
+    header.appendChild(identity);
+    header.appendChild(controls);
+    card.appendChild(header);
+    adminMembersList.appendChild(card);
+}
+
+// --- renderAdminPanel ---
 async function renderAdminPanel() {
     adminMembersList.innerHTML = "";
     const loading = document.createElement("div");
@@ -1537,87 +1787,8 @@ async function renderAdminPanel() {
     members.forEach(member => renderAdminCard(member, isOwner));
 }
 
-async function renderMembers() {
-    membersList.innerHTML = "";
-    const loading = document.createElement("div");
-    loading.className = "empty-state";
-    loading.textContent = "Loading members...";
-    membersList.appendChild(loading);
-
-    members = await fetchMembers();
-    await fetchStats();
-    membersList.innerHTML = "";
-
-    if (members.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "empty-state";
-        empty.textContent = "No members found.";
-        membersList.appendChild(empty);
-        return;
-    }
-
-    const roleOrder = { Owner: 0, Admin: 1 };
-    const sorted = [...members].sort((a, b) => {
-        const ra = roleOrder[a.role] ?? 2;
-        const rb = roleOrder[b.role] ?? 2;
-        if (ra !== rb) return ra - rb;
-        return new Date(a.joined_at) - new Date(b.joined_at);
-    });
-
-    sorted.forEach(member => {
-        const card = document.createElement("div");
-        card.className = "member-card";
-
-        const header = document.createElement("div");
-        header.className = "member-card-header";
-
-        const avatar = document.createElement("div");
-        avatar.className = "member-avatar";
-        // --- Show image if available, else initials ---
-        if (member.avatar_url) {
-            avatar.style.backgroundImage = `url(${member.avatar_url})`;
-            avatar.style.backgroundSize = 'cover';
-            avatar.style.backgroundPosition = 'center';
-            avatar.textContent = '';
-        } else {
-            avatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
-            avatar.textContent = getInitial(member.display_name || member.username);
-        }
-
-        const nameWrap = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "member-card-name";
-        name.textContent = member.display_name || member.username || "Unknown";
-
-        const username = document.createElement("div");
-        username.className = "member-card-username";
-        username.textContent = "@" + (member.username || "unknown");
-
-        nameWrap.appendChild(name);
-        nameWrap.appendChild(username);
-        header.appendChild(avatar);
-        header.appendChild(nameWrap);
-
-        const badges = document.createElement("div");
-        badges.className = "member-badges";
-        renderBadges(badges, member);
-        card.appendChild(header);
-        card.appendChild(badges);
-
-        if (member.bio) {
-            const bio = document.createElement("div");
-            bio.className = "member-card-bio";
-            bio.textContent = member.bio;
-            card.appendChild(bio);
-        }
-
-        card.addEventListener("click", () => openProfile(member.id));
-        membersList.appendChild(card);
-    });
-}
-
 // ============================================================
-// PAGE FUNCTIONS (unchanged)
+// PAGE FUNCTIONS
 // ============================================================
 
 function openPage(id) {
