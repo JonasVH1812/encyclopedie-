@@ -207,6 +207,11 @@ nav { flex: 1; overflow: hidden; }
     color: #0a0f1e;
     flex-shrink: 0;
 }
+.account-dropdown-avatar {
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+}
 
 .account-dropdown-name {
     font-weight: 600;
