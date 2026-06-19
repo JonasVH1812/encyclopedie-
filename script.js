@@ -1183,15 +1183,43 @@ async function renderMembers() {
         var info = document.createElement("div");
         var name = document.createElement("div"); name.className = "member-card-name"; name.textContent = m.display_name || m.username;
         var uname = document.createElement("div"); uname.className = "member-card-username"; uname.textContent = "@" + m.username;
-        info.append(name, uname);
+
+        // Role badge
+        var roleBadge = document.createElement("span");
+        roleBadge.className = badgeClass(m.role);
+        roleBadge.textContent = m.role;
+        roleBadge.style.marginTop = "6px";
+
+        info.append(name, uname, roleBadge);
         header.append(avatar, info);
         card.appendChild(header);
-        if (m.bio) { var bio = document.createElement("div"); bio.className = "member-card-bio"; bio.textContent = m.bio; card.appendChild(bio); }
+
+        // Extra tag badges
+        if (Array.isArray(m.extra_tags) && m.extra_tags.length > 0) {
+            var tagWrap = document.createElement("div");
+            tagWrap.className = "member-badges";
+            tagWrap.style.marginTop = "2px";
+            m.extra_tags.forEach(function (tag) {
+                var b = document.createElement("span");
+                b.className = badgeClass(tag);
+                b.textContent = tag;
+                b.dataset.tooltip = BADGE_DESCRIPTIONS[tag] || tag;
+                tagWrap.appendChild(b);
+            });
+            card.appendChild(tagWrap);
+        }
+
+        if (m.bio) {
+            var bio = document.createElement("div");
+            bio.className = "member-card-bio";
+            bio.textContent = m.bio;
+            card.appendChild(bio);
+        }
+
         card.addEventListener("click", function () { openProfile(m.id); });
         membersList.appendChild(card);
     });
 }
-
 // ============================================================
 // PROFILE VIEW / EDIT
 // ============================================================
