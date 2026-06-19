@@ -1637,3 +1637,43 @@ footer {
     color: #818cf8;
     border: 1px solid rgba(129,140,248,.35);
 }
+/* === iOS‑only snap‑scroll for community sub‑nav === */
+.ios-app .community-subnav {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;               /* hide scrollbar on Firefox */
+  gap: 2px;                            /* keep buttons close */
+  padding: 4px;                        /* inner padding for snap */
+}
+
+.ios-app .community-subnav::-webkit-scrollbar {
+  display: none;                       /* hide scrollbar on Chrome/Safari */
+}
+
+.ios-app .community-subnav .subnav-btn {
+  flex: 0 0 auto;                      /* prevent stretching */
+  scroll-snap-align: start;            /* snap to the left edge */
+  white-space: nowrap;                 /* keep text on one line */
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.ios-app .community-subnav .subnav-btn.active {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+/* Optional: adjust container to fill width and center when not overflowing */
+.ios-app .community-subnav-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
