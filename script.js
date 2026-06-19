@@ -561,9 +561,25 @@ editBtn.addEventListener("click", function () {
 deleteBtn.addEventListener("click", function () {
     var page = pages.find(function (p) { return p.id === currentPageId; });
     if (!page) return;
+    
+    // Capture the ID in a local variable so it doesn't get reset before the async callback finishes
+    var pageIdToDelete = currentPageId;
+    
     showDeleteDialog("Delete Page", 'Are you sure you want to delete "' + page.title + '"? This cannot be undone.', async function () {
-        await sb.from("pages").delete().eq("id", currentPageId);
-        pages = pages.filter(function (p) { return p.id !== currentPageId; });
+        // CRITICAL: { count: "exact" } tells us how many rows actually got deleted
+        var res = await sb.from("pages").delete({ count: "exact" }).eq("id", pageIdToDelete);
+        
+        if (res.error) {
+            throw new Error(res.error.message);
+        }
+        
+        // If 0 rows deleted, RLS silently blocked it — treat as error
+        if (res.count === 0) {
+            throw new Error("Could not delete page. You might not have permission.");
+        }
+        
+        // Only remove from UI after database confirms the delete
+        pages = pages.filter(function (p) { return p.id !== pageIdToDelete; });
         currentPageId = null;
         renderHome();
     });
