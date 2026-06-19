@@ -1,7 +1,3 @@
-// Add iOS‑specific class for native scrolling behavior
-if (window.Capacitor && window.Capacitor.getPlatform() === 'ios') {
-  document.body.classList.add('ios-app');
-}
 document.addEventListener("mousemove", (e) => {
     document.body.style.setProperty("--x", e.clientX + "px");
     document.body.style.setProperty("--y", e.clientY + "px");
@@ -26,6 +22,11 @@ let posts = [];
 let members = [];
 let profileStatsMap = {};
 let viewingProfileId = null;
+
+// Voting state
+let postSortOrder = "hot";
+let userVotes = {};
+let postVoteCounts = {};
 
 const CATEGORIES = ["All", "Ideas", "Projects", "Plans", "Diary", "Other"];
 const ROLE_OPTIONS = ["Member", "Admin", "Owner"];
@@ -149,9 +150,87 @@ const accountMainMenu       = document.getElementById("accountMainMenu");
 const accountSettingsMenu   = document.getElementById("accountSettingsMenu");
 const dropdownOverlay       = document.getElementById("dropdownOverlay");
 
-// --- Tooltip elements ---
 const tooltipEl = document.getElementById("tooltip");
 let tooltipTimeout = null;
+
+// ============================================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================================
+
+const toastContainer = document.createElement('div');
+toastContainer.className = 'toast-container';
+document.body.appendChild(toastContainer);
+
+function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+
+    const icons = { success: '✓', error: '✕', info: 'ℹ' };
+
+    toast.innerHTML =
+        '<span class="toast-icon">' + (icons[type] || icons.info) + '</span>' +
+        '<span class="toast-message">' + message + '</span>' +
+        '<div class="toast-progress" style="animation-duration: ' + duration + 'ms"></div>';
+
+    toastContainer.appendChild(toast);
+
+    setTimeout(function() {
+        toast.style.animation = 'toastSlideOut 0.3s ease forwards';
+        setTimeout(function() { toast.remove(); }, 300);
+    }, duration);
+}
+
+// ============================================================
+// DELETE DIALOG SYSTEM
+// ============================================================
+
+function showDeleteDialog(title, message, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'delete-dialog-overlay';
+
+    overlay.innerHTML =
+        '<div class="delete-dialog">' +
+            '<div class="delete-dialog-icon">🗑️</div>' +
+            '<h3>' + title + '</h3>' +
+            '<p>' + message + '</p>' +
+            '<div class="delete-dialog-actions">' +
+                '<button class="btn" id="deleteCancelBtn">Cancel</button>' +
+                '<button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>' +
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+
+    var close = function() {
+        overlay.style.animation = 'fadeIn 0.2s ease reverse forwards';
+        setTimeout(function() { overlay.remove(); }, 200);
+    };
+
+    overlay.querySelector('#deleteCancelBtn').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) close();
+    });
+
+    overlay.querySelector('#deleteConfirmBtn').addEventListener('click', async function() {
+        var confirmBtn = overlay.querySelector('#deleteConfirmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+
+        try {
+            await onConfirm();
+            close();
+            showToast('Successfully deleted', 'success');
+        } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete';
+            showToast(err.message || 'Failed to delete', 'error');
+        }
+    });
+}
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
 
 function formatDate(ts) {
     const d = new Date(ts);
@@ -160,12 +239,12 @@ function formatDate(ts) {
 }
 
 function showOnly(section) {
-    [hero, content, communityTab, pageView, editor].forEach(el => el.classList.add("hidden"));
+    [hero, content, communityTab, pageView, editor].forEach(function(el) { el.classList.add("hidden"); });
     section.classList.remove("hidden");
 }
 
 function showCommunitySection(section) {
-    [communityFeed, communityMembers, communityAdmin, profileView, profileEditView, postEditor].forEach(el => el.classList.add("hidden"));
+    [communityFeed, communityMembers, communityAdmin, profileView, profileEditView, postEditor].forEach(function(el) { el.classList.add("hidden"); });
     section.classList.remove("hidden");
 }
 
@@ -196,7 +275,7 @@ function renderBadges(container, profile) {
     container.appendChild(roleBadge);
 
     const tags = Array.isArray(profile.extra_tags) ? profile.extra_tags : [];
-    tags.forEach(tag => {
+    tags.forEach(function(tag) {
         const span = document.createElement("span");
         span.className = badgeClass(tag);
         span.textContent = tag;
@@ -213,17 +292,34 @@ function isOwnerUser(profile) {
     return profile && profile.role === "Owner";
 }
 
+function canEditPost(post) {
+    if (!currentUser) return false;
+    if (post.user_id === currentUser.id) return true;
+    const role = currentProfile?.role;
+    return role === 'Admin' || role === 'Owner';
+}
+
+function canEditComment(comment) {
+    if (!currentUser) return false;
+    if (comment.user_id === currentUser.id) return true;
+    const role = currentProfile?.role;
+    return role === 'Admin' || role === 'Owner';
+}
+
+// ============================================================
+// ACCOUNT UI
+// ============================================================
+
 function updateAccountUI() {
     if (!currentProfile) return;
     const initial = getInitial(currentProfile.display_name || currentProfile.username);
 
-    // --- Top‑right account avatar ---
     if (accountAvatar) {
         if (currentProfile.avatar_url) {
-            accountAvatar.style.backgroundImage = `url(${currentProfile.avatar_url})`;
+            accountAvatar.style.backgroundImage = 'url(' + currentProfile.avatar_url + ')';
             accountAvatar.style.backgroundSize = 'cover';
             accountAvatar.style.backgroundPosition = 'center';
-            accountAvatar.textContent = '';   // remove initials
+            accountAvatar.textContent = '';
         } else {
             accountAvatar.style.backgroundImage = 'none';
             accountAvatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
@@ -231,10 +327,9 @@ function updateAccountUI() {
         }
     }
 
-    // --- Dropdown avatar (same logic) ---
     if (accountDropdownAvatar) {
         if (currentProfile.avatar_url) {
-            accountDropdownAvatar.style.backgroundImage = `url(${currentProfile.avatar_url})`;
+            accountDropdownAvatar.style.backgroundImage = 'url(' + currentProfile.avatar_url + ')';
             accountDropdownAvatar.style.backgroundSize = 'cover';
             accountDropdownAvatar.style.backgroundPosition = 'center';
             accountDropdownAvatar.textContent = '';
@@ -245,7 +340,6 @@ function updateAccountUI() {
         }
     }
 
-    // Name & role
     if (accountDropdownName) accountDropdownName.textContent = currentProfile.display_name || currentProfile.username;
     if (accountDropdownRole) accountDropdownRole.textContent = currentProfile.role || "Member";
 }
@@ -312,24 +406,24 @@ function setupAccountDropdown() {
     if (dropdownSettingsBtn) dropdownSettingsBtn.addEventListener("click", showSettingsMenu);
     if (dropdownSettingsBackBtn) dropdownSettingsBackBtn.addEventListener("click", showMainMenu);
     if (dropdownLogoutBtn) {
-        dropdownLogoutBtn.addEventListener("click", () => {
+        dropdownLogoutBtn.addEventListener("click", function() {
             closeDropdown();
             logoutBtn.click();
         });
     }
     if (dropdownNewPageBtn) {
-        dropdownNewPageBtn.addEventListener("click", () => {
+        dropdownNewPageBtn.addEventListener("click", function() {
             closeDropdown();
             newPageBtn.click();
         });
     }
     if (dropdownProfileBtn) {
-        dropdownProfileBtn.addEventListener("click", () => {
+        dropdownProfileBtn.addEventListener("click", function() {
             closeDropdown();
-            const communityLink = document.querySelector('.navbar a[data-community]') ||
-                [...document.querySelectorAll('.navbar a')].find(a => a.textContent.trim() === 'Community');
+            var communityLink = document.querySelector('.navbar a[data-community]') ||
+                [...document.querySelectorAll('.navbar a')].find(function(a) { return a.textContent.trim() === 'Community'; });
             if (communityLink) communityLink.click();
-            setTimeout(() => {
+            setTimeout(function() {
                 if (typeof openProfile === 'function' && currentUser) {
                     openProfile(currentUser.id);
                 }
@@ -337,7 +431,7 @@ function setupAccountDropdown() {
         });
     }
     if (settingsSaveBtn) {
-        settingsSaveBtn.addEventListener("click", async () => {
+        settingsSaveBtn.addEventListener("click", async function() {
             const displayName = settingsDisplayName.value.trim();
             const username = settingsUsername.value.trim();
             const bio = settingsBio.value.trim();
@@ -352,8 +446,8 @@ function setupAccountDropdown() {
             settingsSaveBtn.textContent = "Saving...";
             const { error } = await sb.from("profiles").update({
                 display_name: displayName,
-                username,
-                bio,
+                username: username,
+                bio: bio,
                 updated_at: new Date().toISOString()
             }).eq("id", currentUser.id);
             settingsSaveBtn.disabled = false;
@@ -367,15 +461,19 @@ function setupAccountDropdown() {
             }
             await fetchProfile();
             updateAccountUI();
-            if (viewMode === 'my' && renderHome) renderHome();
-            pageTitle.textContent = `Encyclopedie van ${currentProfile.display_name || currentProfile.username}`;
-            welcomeHeading.textContent = `Welcome, ${currentProfile.display_name || currentProfile.username}`;
+            if (viewMode === 'my' && typeof renderHome === 'function') renderHome();
+            pageTitle.textContent = 'Encyclopedie van ' + (currentProfile.display_name || currentProfile.username);
+            welcomeHeading.textContent = 'Welcome, ' + (currentProfile.display_name || currentProfile.username);
             if (settingsError) settingsError.classList.add("hidden");
             settingsSaveBtn.textContent = "✓ Saved!";
-            setTimeout(() => { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
+            setTimeout(function() { if (settingsSaveBtn) settingsSaveBtn.textContent = "Save Changes"; }, 1500);
         });
     }
 }
+
+// ============================================================
+// AUTH
+// ============================================================
 
 function setAuthMode(mode) {
     authMode = mode;
@@ -399,12 +497,12 @@ function setAuthMode(mode) {
     }
 }
 
-authSwitchLink.addEventListener("click", (e) => {
+authSwitchLink.addEventListener("click", function(e) {
     e.preventDefault();
     setAuthMode(authMode === "signin" ? "signup" : "signin");
 });
 
-authSubmitBtn.addEventListener("click", async () => {
+authSubmitBtn.addEventListener("click", async function() {
     const email    = authEmail.value.trim();
     const password = authPassword.value;
     const name     = authName.value.trim();
@@ -423,8 +521,8 @@ authSubmitBtn.addEventListener("click", async () => {
     try {
         if (authMode === "signup") {
             const { data, error } = await sb.auth.signUp({
-                email,
-                password,
+                email: email,
+                password: password,
                 options: { data: { name: name || email.split("@")[0] } }
             });
             if (error) throw error;
@@ -434,7 +532,7 @@ authSubmitBtn.addEventListener("click", async () => {
                 setAuthMode("signin");
             }
         } else {
-            const { error } = await sb.auth.signInWithPassword({ email, password });
+            const { error } = await sb.auth.signInWithPassword({ email: email, password: password });
             if (error) throw error;
         }
     } catch (err) {
@@ -446,9 +544,9 @@ authSubmitBtn.addEventListener("click", async () => {
     }
 });
 
-logoutBtn.addEventListener("click", async () => await sb.auth.signOut());
+logoutBtn.addEventListener("click", async function() { await sb.auth.signOut(); });
 
-sb.auth.onAuthStateChange((event, session) => {
+sb.auth.onAuthStateChange(function(event, session) {
     currentUser = session?.user || null;
     if (currentUser) showApp(); else showAuth();
 });
@@ -466,8 +564,8 @@ async function showApp() {
     appContent.classList.remove("hidden");
 
     const name = getDisplayName(currentUser);
-    pageTitle.textContent = `Encyclopedie van ${name}`;
-    welcomeHeading.textContent = `Welcome, ${name}`;
+    pageTitle.textContent = 'Encyclopedie van ' + name;
+    welcomeHeading.textContent = 'Welcome, ' + name;
 
     await fetchProfile();
     updateAccountUI();
@@ -485,12 +583,11 @@ async function fetchProfile() {
     if (error) console.error("fetchProfile error:", error);
 
     if (!data) {
-        const isOwner = currentUser.email === OWNER_EMAIL;
         const { data: newData, error: insertErr } = await sb.from("profiles").insert({
             id: currentUser.id,
             username: currentUser.email.split("@")[0],
             display_name: getDisplayName(currentUser),
-            role: isOwner ? "Owner" : "Member",
+            role: "Member",
             extra_tags: []
         }).select().single();
         if (insertErr) console.error("fetchProfile insert error:", insertErr);
@@ -505,20 +602,26 @@ async function fetchProfile() {
 async function fetchPages() {
     const { data, error } = await sb.from("pages").select("*").order("updated_at", { ascending: false });
     if (error) console.error(error);
-    pages = (data || []).map(row => ({
-        id: row.id,
-        title: row.title,
-        category: row.category,
-        content: row.content,
-        created: new Date(row.created_at).getTime(),
-        updated: new Date(row.updated_at).getTime()
-    }));
+    pages = (data || []).map(function(row) {
+        return {
+            id: row.id,
+            title: row.title,
+            category: row.category,
+            content: row.content,
+            created: new Date(row.created_at).getTime(),
+            updated: new Date(row.updated_at).getTime()
+        };
+    });
 }
+
+// ============================================================
+// NAVBAR
+// ============================================================
 
 function renderNavbar() {
     navbar.innerHTML = "";
 
-    const addLink = (text, isCommunity = false, cat = null) => {
+    function addLink(text, isCommunity, cat) {
         const li = document.createElement("li");
         const a = document.createElement("a");
         a.href = "#";
@@ -526,7 +629,7 @@ function renderNavbar() {
         if (isCommunity) a.setAttribute("data-community", "true");
         if (viewMode === "my" && cat === activeCategory) a.classList.add("active");
         if (viewMode === "community" && isCommunity) a.classList.add("active");
-        a.addEventListener("click", async (e) => {
+        a.addEventListener("click", async function(e) {
             e.preventDefault();
             if (isCommunity) {
                 viewMode = "community";
@@ -543,34 +646,38 @@ function renderNavbar() {
         });
         li.appendChild(a);
         navbar.appendChild(li);
-    };
+    }
 
     addLink("All", false, "All");
     addLink("Community", true);
-    CATEGORIES.forEach(cat => {
+    CATEGORIES.forEach(function(cat) {
         if (cat !== "All") addLink(cat, false, cat);
     });
 }
+
+// ============================================================
+// HOME / PAGES
+// ============================================================
 
 function renderHome() {
     showOnly(content);
     hero.classList.remove("hidden");
     content.innerHTML = "";
 
-    const filtered = activeCategory === "All" ? pages : pages.filter(p => p.category === activeCategory);
-    const sorted   = [...filtered].sort((a, b) => b.updated - a.updated);
+    const filtered = activeCategory === "All" ? pages : pages.filter(function(p) { return p.category === activeCategory; });
+    const sorted   = [...filtered].sort(function(a, b) { return b.updated - a.updated; });
 
     if (sorted.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
         empty.textContent = activeCategory === "All"
             ? "No pages yet. Click '+ New Page'."
-            : `No pages in "${activeCategory}" yet.`;
+            : 'No pages in "' + activeCategory + '" yet.';
         content.appendChild(empty);
         return;
     }
 
-    sorted.forEach(p => {
+    sorted.forEach(function(p) {
         const article  = document.createElement("article");
         const cat      = document.createElement("span"); cat.className = "card-category"; cat.textContent = p.category;
         const h3       = document.createElement("h3"); h3.textContent = p.title;
@@ -578,10 +685,135 @@ function renderHome() {
         const date     = document.createElement("div"); date.className = "card-date"; date.textContent = "Updated " + formatDate(p.updated);
 
         article.append(cat, h3, snippet, date);
-        article.addEventListener("click", () => openPage(p.id));
+        article.addEventListener("click", function() { openPage(p.id); });
         content.appendChild(article);
     });
 }
+
+// ============================================================
+// PAGE VIEW / EDIT / DELETE
+// ============================================================
+
+function openPage(id) {
+    currentPageId = id;
+    const page = pages.find(function(p) { return p.id === id; });
+    if (!page) return;
+
+    showOnly(pageView);
+    hero.classList.add("hidden");
+    pageTitleDisplay.textContent = page.title;
+    pageMeta.textContent = page.category + " · Created " + formatDate(page.created) + " · Updated " + formatDate(page.updated);
+    pageContentDisplay.textContent = page.content;
+}
+
+editBtn.addEventListener("click", function() {
+    const page = pages.find(function(p) { return p.id === currentPageId; });
+    if (!page) return;
+
+    showOnly(editor);
+    hero.classList.add("hidden");
+    editorHeading.textContent = "Edit Page";
+    pageTitleInput.value = page.title;
+    pageCategoryInput.value = page.category;
+    pageContentInput.value = page.content;
+    saveBtn.onclick = saveExistingPage;
+});
+
+deleteBtn.addEventListener("click", function() {
+    const page = pages.find(function(p) { return p.id === currentPageId; });
+    if (!page) return;
+
+    showDeleteDialog(
+        "Delete Page",
+        'Are you sure you want to delete "' + page.title + '"? This action cannot be undone.',
+        async function() {
+            await sb.from("pages").delete().eq("id", currentPageId);
+            pages = pages.filter(function(p) { return p.id !== currentPageId; });
+            currentPageId = null;
+            renderHome();
+        }
+    );
+});
+
+closeBtn.addEventListener("click", function() {
+    currentPageId = null;
+    renderHome();
+});
+
+newPageBtn.addEventListener("click", function() {
+    showOnly(editor);
+    hero.classList.add("hidden");
+    editorHeading.textContent = "New Page";
+    pageTitleInput.value = "";
+    pageCategoryInput.value = "Ideas";
+    pageContentInput.value = "";
+    saveBtn.onclick = saveNewPage;
+    pageTitleInput.focus();
+});
+
+cancelBtn.addEventListener("click", function() {
+    currentPageId = null;
+    renderHome();
+});
+
+async function saveNewPage() {
+    const title = pageTitleInput.value.trim();
+    if (!title) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    try {
+        const { error } = await sb.from("pages").insert({
+            user_id: currentUser.id,
+            title: title,
+            category: pageCategoryInput.value,
+            content: pageContentInput.value.trim()
+        });
+        if (error) throw error;
+
+        await fetchPages();
+        currentPageId = null;
+        renderHome();
+        showToast("Page created!", "success");
+    } catch (err) {
+        showToast("Could not save: " + (err.message || "unknown error"), "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+    }
+}
+
+async function saveExistingPage() {
+    const title = pageTitleInput.value.trim();
+    if (!title) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    try {
+        const { error } = await sb.from("pages").update({
+            title: title,
+            category: pageCategoryInput.value,
+            content: pageContentInput.value.trim(),
+            updated_at: new Date().toISOString()
+        }).eq("id", currentPageId);
+        if (error) throw error;
+
+        await fetchPages();
+        openPage(currentPageId);
+        showToast("Page updated!", "success");
+    } catch (err) {
+        showToast("Could not save: " + (err.message || "unknown error"), "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+    }
+}
+
+// ============================================================
+// COMMUNITY
+// ============================================================
 
 async function enterCommunity() {
     showOnly(communityTab);
@@ -597,9 +829,9 @@ async function enterCommunity() {
 
 function setCommunitySubview(view) {
     communitySubview = view;
-    document.querySelectorAll(".subnav-btn").forEach(btn =>
-        btn.classList.toggle("active", btn.dataset.subview === view)
-    );
+    document.querySelectorAll(".subnav-btn").forEach(function(btn) {
+        btn.classList.toggle("active", btn.dataset.subview === view);
+    });
 
     if (view === "feed") {
         showCommunitySection(communityFeed);
@@ -613,20 +845,23 @@ function setCommunitySubview(view) {
     }
 }
 
-document.querySelectorAll(".subnav-btn").forEach(btn =>
-    btn.addEventListener("click", () => setCommunitySubview(btn.dataset.subview))
-);
+document.querySelectorAll(".subnav-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() { setCommunitySubview(btn.dataset.subview); });
+});
 
 // ============================================================
-// NEW: Image compression helper (Canvas)
+// IMAGE COMPRESSION
 // ============================================================
 
-async function compressImage(file, maxWidth = 1200, quality = 0.8, type = 'image/webp') {
-    return new Promise((resolve, reject) => {
+async function compressImage(file, maxWidth, quality, type) {
+    maxWidth = maxWidth || 1200;
+    quality = quality || 0.8;
+    type = type || 'image/webp';
+    return new Promise(function(resolve, reject) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = function(e) {
             const img = new Image();
-            img.onload = () => {
+            img.onload = function() {
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
@@ -638,7 +873,7 @@ async function compressImage(file, maxWidth = 1200, quality = 0.8, type = 'image
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => {
+                canvas.toBlob(function(blob) {
                     if (blob) resolve(blob);
                     else reject(new Error('Compression failed'));
                 }, type, quality);
@@ -651,51 +886,38 @@ async function compressImage(file, maxWidth = 1200, quality = 0.8, type = 'image
     });
 }
 
-// ============================================================
-// NEW: Upload image to storage
-// ============================================================
-
 async function uploadImage(file, bucket, folder, fileName) {
-    const path = `${folder}/${fileName}`;
-    const { data, error } = await sb.storage
-        .from(bucket)
-        .upload(path, file, { upsert: true });
+    const path = folder + '/' + fileName;
+    const { data, error } = await sb.storage.from(bucket).upload(path, file, { upsert: true });
     if (error) throw error;
     const { data: urlData } = sb.storage.from(bucket).getPublicUrl(path);
     return urlData.publicUrl;
 }
 
 // ============================================================
-// NEW: Profile picture upload
+// AVATAR UPLOAD
 // ============================================================
 
-const avatarInput = document.getElementById('avatarInput');
-const avatarPreviewImg = document.getElementById('avatarPreviewImg');
-const avatarUploadStatus = document.getElementById('avatarUploadStatus');
+var avatarInput = document.getElementById('avatarInput');
+var avatarPreviewImg = document.getElementById('avatarPreviewImg');
+var avatarUploadStatus = document.getElementById('avatarUploadStatus');
 
-avatarInput?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+avatarInput?.addEventListener('change', async function(e) {
+    var file = e.target.files[0];
     if (!file) return;
 
     avatarUploadStatus.textContent = 'Compressing...';
     try {
-        const compressedBlob = await compressImage(file, 800, 0.85);
-        const ext = file.name.split('.').pop() || 'jpg';
-        const fileName = `avatar.${ext}`;
-        const url = await uploadImage(
-            compressedBlob,
-            'profile-pictures',
-            currentUser.id,
-            fileName
-        );
+        var compressedBlob = await compressImage(file, 800, 0.85);
+        var ext = file.name.split('.').pop() || 'jpg';
+        var fileName = 'avatar.' + ext;
+        var url = await uploadImage(compressedBlob, 'profile-pictures', currentUser.id, fileName);
         avatarPreviewImg.src = url;
         avatarUploadStatus.textContent = '✓ Uploaded';
-        // Save to profile
-        const { error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', currentUser.id);
+        var { error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', currentUser.id);
         if (error) throw error;
         currentProfile.avatar_url = url;
         updateAccountUI();
-        // Update profile view if open
         if (viewingProfileId === currentUser.id) {
             await openProfile(currentUser.id);
         }
@@ -706,78 +928,70 @@ avatarInput?.addEventListener('change', async (e) => {
 });
 
 // ============================================================
-// NEW: Post image upload (multiple)
+// POST IMAGE UPLOAD
 // ============================================================
 
-let postImageFiles = []; // store URLs of uploaded images
+var postImageFiles = [];
 
-const postImageInput = document.getElementById('postImageInput');
-const postImageDropArea = document.getElementById('postImageDropArea');
-const postImagePreviews = document.getElementById('postImagePreviews');
-const postImageUploadStatus = document.getElementById('postImageUploadStatus');
+var postImageInput = document.getElementById('postImageInput');
+var postImageDropArea = document.getElementById('postImageDropArea');
+var postImagePreviews = document.getElementById('postImagePreviews');
+var postImageUploadStatus = document.getElementById('postImageUploadStatus');
 
-// Click to upload
-postImageDropArea?.addEventListener('click', () => postImageInput.click());
+postImageDropArea?.addEventListener('click', function() { postImageInput.click(); });
 
-// Drag & drop
-postImageDropArea?.addEventListener('dragover', (e) => {
+postImageDropArea?.addEventListener('dragover', function(e) {
     e.preventDefault();
     postImageDropArea.classList.add('dragover');
 });
-postImageDropArea?.addEventListener('dragleave', () => {
+postImageDropArea?.addEventListener('dragleave', function() {
     postImageDropArea.classList.remove('dragover');
 });
-postImageDropArea?.addEventListener('drop', async (e) => {
+postImageDropArea?.addEventListener('drop', async function(e) {
     e.preventDefault();
     postImageDropArea.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length) await handlePostImageFiles(files);
+    if (e.dataTransfer.files.length) await handlePostImageFiles(e.dataTransfer.files);
 });
 
-postImageInput?.addEventListener('change', async (e) => {
+postImageInput?.addEventListener('change', async function(e) {
     if (e.target.files.length) await handlePostImageFiles(e.target.files);
 });
 
 async function handlePostImageFiles(fileList) {
     postImageUploadStatus.textContent = 'Compressing...';
-    const files = Array.from(fileList);
-    const total = files.length;
-    let uploaded = 0;
-    for (const file of files) {
+    var files = Array.from(fileList);
+    var total = files.length;
+    var uploaded = 0;
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
         try {
-            const compressed = await compressImage(file, 1200, 0.8);
-            const ext = file.name.split('.').pop() || 'jpg';
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-            const url = await uploadImage(
-                compressed,
-                'community-posts',
-                currentUser.id,
-                fileName
-            );
-            // Store the URL and preview
+            var compressed = await compressImage(file, 1200, 0.8);
+            var ext = file.name.split('.').pop() || 'jpg';
+            var fileName = Date.now() + '-' + Math.random().toString(36).substring(7) + '.' + ext;
+            var url = await uploadImage(compressed, 'community-posts', currentUser.id, fileName);
             postImageFiles.push(url);
             addPostImagePreview(url);
             uploaded++;
-            postImageUploadStatus.textContent = `Uploaded ${uploaded}/${total}`;
+            postImageUploadStatus.textContent = 'Uploaded ' + uploaded + '/' + total;
         } catch (err) {
             console.error('Image upload error:', err);
-            postImageUploadStatus.textContent = `❌ Failed: ${err.message}`;
+            postImageUploadStatus.textContent = '❌ Failed: ' + err.message;
         }
     }
     if (uploaded === total) postImageUploadStatus.textContent = '✓ All images uploaded';
 }
 
 function addPostImagePreview(url) {
-    const container = document.createElement('div');
+    var container = document.createElement('div');
     container.className = 'image-preview-item';
-    const img = document.createElement('img');
+    var img = document.createElement('img');
     img.src = url;
-    const removeBtn = document.createElement('button');
+    var removeBtn = document.createElement('button');
     removeBtn.className = 'remove-image';
     removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', (e) => {
+    removeBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        const idx = postImageFiles.indexOf(url);
+        var idx = postImageFiles.indexOf(url);
         if (idx > -1) {
             postImageFiles.splice(idx, 1);
             container.remove();
@@ -787,53 +1001,271 @@ function addPostImagePreview(url) {
     postImagePreviews.appendChild(container);
 }
 
-// When editing a post, load existing images
 function loadPostImages(imageUrls) {
     postImagePreviews.innerHTML = '';
-    postImageFiles = imageUrls ? [...imageUrls] : [];
-    postImageFiles.forEach(url => addPostImagePreview(url));
+    postImageFiles = imageUrls ? imageUrls.slice() : [];
+    postImageFiles.forEach(function(url) { addPostImagePreview(url); });
 }
 
 // ============================================================
-// NEW: Post editing permissions
+// VOTING SYSTEM
 // ============================================================
 
-function canEditPost(post) {
-    if (!currentUser) return false;
-    if (post.user_id === currentUser.id) return true;
-    const role = currentProfile?.role;
-    return role === 'Admin' || role === 'Owner';
+async function fetchUserVotes(postIds) {
+    if (!currentUser || !postIds.length) return;
+
+    var { data, error } = await sb
+        .from('post_votes')
+        .select('post_id, vote_type')
+        .eq('user_id', currentUser.id)
+        .in('post_id', postIds);
+
+    if (error) {
+        console.error('Error fetching user votes:', error);
+        return;
+    }
+
+    userVotes = {};
+    (data || []).forEach(function(v) {
+        userVotes[v.post_id] = v.vote_type;
+    });
 }
 
-function canEditComment(comment) {
-    if (!currentUser) return false;
-    if (comment.user_id === currentUser.id) return true;
-    const role = currentProfile?.role;
-    return role === 'Admin' || role === 'Owner';
+async function fetchVoteCounts(postIds) {
+    if (!postIds.length) return;
+
+    var { data, error } = await sb
+        .from('post_votes')
+        .select('post_id, vote_type');
+
+    if (error) {
+        console.error('Error fetching vote counts:', error);
+        return;
+    }
+
+    postVoteCounts = {};
+    postIds.forEach(function(id) {
+        postVoteCounts[id] = { upvotes: 0, downvotes: 0, net: 0 };
+    });
+
+    (data || []).forEach(function(v) {
+        if (postVoteCounts[v.post_id]) {
+            if (v.vote_type === 1) {
+                postVoteCounts[v.post_id].upvotes++;
+                postVoteCounts[v.post_id].net++;
+            } else {
+                postVoteCounts[v.post_id].downvotes++;
+                postVoteCounts[v.post_id].net--;
+            }
+        }
+    });
+}
+
+async function handleVote(postId, voteType) {
+    if (!currentUser) return;
+
+    var currentVote = userVotes[postId];
+    var newVoteType = voteType;
+
+    if (currentVote === voteType) {
+        newVoteType = 0;
+    }
+
+    try {
+        if (currentVote) {
+            var { error } = await sb
+                .from('post_votes')
+                .delete()
+                .eq('post_id', postId)
+                .eq('user_id', currentUser.id);
+
+            if (error) throw error;
+
+            if (postVoteCounts[postId]) {
+                if (currentVote === 1) postVoteCounts[postId].upvotes--;
+                else postVoteCounts[postId].downvotes--;
+                postVoteCounts[postId].net = postVoteCounts[postId].upvotes - postVoteCounts[postId].downvotes;
+            }
+            delete userVotes[postId];
+        }
+
+        if (newVoteType !== 0) {
+            var { error } = await sb
+                .from('post_votes')
+                .insert({
+                    post_id: postId,
+                    user_id: currentUser.id,
+                    vote_type: newVoteType
+                });
+
+            if (error) throw error;
+
+            if (!postVoteCounts[postId]) {
+                postVoteCounts[postId] = { upvotes: 0, downvotes: 0, net: 0 };
+            }
+            if (newVoteType === 1) postVoteCounts[postId].upvotes++;
+            else postVoteCounts[postId].downvotes++;
+            postVoteCounts[postId].net = postVoteCounts[postId].upvotes - postVoteCounts[postId].downvotes;
+            userVotes[postId] = newVoteType;
+        }
+
+        updateVoteUI(postId);
+
+    } catch (err) {
+        console.error('Vote error:', err);
+        showToast('Failed to vote', 'error');
+    }
+}
+
+function updateVoteUI(postId) {
+    var card = document.querySelector('[data-post-id="' + postId + '"]');
+    if (!card) return;
+
+    var upvoteBtn = card.querySelector('.vote-btn.upvote');
+    var downvoteBtn = card.querySelector('.vote-btn.downvote');
+    var voteCountEl = card.querySelector('.vote-count');
+
+    if (upvoteBtn) {
+        upvoteBtn.classList.toggle('active', userVotes[postId] === 1);
+    }
+    if (downvoteBtn) {
+        downvoteBtn.classList.toggle('active', userVotes[postId] === -1);
+    }
+    if (voteCountEl && postVoteCounts[postId]) {
+        var net = postVoteCounts[postId].net;
+        voteCountEl.textContent = net > 0 ? '+' + net : String(net);
+        voteCountEl.className = 'vote-count ' + (net > 0 ? 'positive' : net < 0 ? 'negative' : 'zero');
+
+        // Bump animation
+        voteCountEl.classList.add('bump');
+        setTimeout(function() { voteCountEl.classList.remove('bump'); }, 150);
+    }
 }
 
 // ============================================================
-// RENDER FEED (updated)
+// SORTING
+// ============================================================
+
+function calculateHotScore(post) {
+    var now = Date.now();
+    var postTime = new Date(post.created_at).getTime();
+    var ageHours = (now - postTime) / (1000 * 60 * 60);
+    var votes = postVoteCounts[post.id]?.net || 0;
+
+    var sign = votes > 0 ? 1 : votes < 0 ? -1 : 0;
+    var magnitude = Math.abs(votes);
+    var order = Math.log10(Math.max(magnitude, 1));
+    var seconds = ageHours * 3600;
+
+    return sign * order + seconds / 45000;
+}
+
+function sortAndRenderPosts() {
+    var postsList = document.getElementById('postsList');
+    if (!postsList) return;
+
+    var sorted = posts.slice();
+
+    switch (postSortOrder) {
+        case 'hot':
+            sorted.sort(function(a, b) {
+                return calculateHotScore(b) - calculateHotScore(a);
+            });
+            break;
+        case 'newest':
+            sorted.sort(function(a, b) {
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+            break;
+        case 'top':
+            sorted.sort(function(a, b) {
+                var votesA = postVoteCounts[a.id]?.net || 0;
+                var votesB = postVoteCounts[b.id]?.net || 0;
+                return votesB - votesA;
+            });
+            break;
+    }
+
+    var pinned = sorted.filter(function(p) { return p.pinned; });
+    var unpinned = sorted.filter(function(p) { return !p.pinned; });
+    sorted = pinned.concat(unpinned);
+
+    postsList.innerHTML = '';
+    sorted.forEach(function(post) { buildPostCard(post, postsList); });
+}
+
+function updateFeedToolbar() {
+    var toolbar = document.getElementById('feedToolbar');
+    if (!toolbar) return;
+
+    toolbar.innerHTML =
+        '<h2 class="feed-title">Community Feed</h2>' +
+        '<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">' +
+            '<div class="sort-container">' +
+                '<span class="sort-label">Sort by:</span>' +
+                '<select class="sort-dropdown" id="postSortDropdown">' +
+                    '<option value="hot"' + (postSortOrder === 'hot' ? ' selected' : '') + '>🔥 Hot</option>' +
+                    '<option value="newest"' + (postSortOrder === 'newest' ? ' selected' : '') + '>🕐 Newest</option>' +
+                    '<option value="top"' + (postSortOrder === 'top' ? ' selected' : '') + '>📊 Top</option>' +
+                '</select>' +
+            '</div>' +
+            '<button class="btn btn-primary" id="newPostBtn">+ New Post</button>' +
+        '</div>';
+
+    document.getElementById('newPostBtn')?.addEventListener('click', function() {
+        postTitleInput.value = "";
+        postCategoryInput.value = "Discussion";
+        postContentInput.value = "";
+        postImageFiles = [];
+        postImagePreviews.innerHTML = "";
+        postImageUploadStatus.textContent = "";
+        postEditor.dataset.editPostId = '';
+        savePostBtn.textContent = 'Post';
+        savePostBtn.onclick = createNewPost;
+        document.querySelector('#postEditor h2').textContent = 'New Post';
+        showCommunitySection(postEditor);
+        postTitleInput.focus();
+    });
+
+    document.getElementById('postSortDropdown')?.addEventListener('change', function(e) {
+        postSortOrder = e.target.value;
+        sortAndRenderPosts();
+    });
+}
+
+// ============================================================
+// RENDER FEED
 // ============================================================
 
 async function renderFeed() {
     postsList.innerHTML = "";
-    const loading = document.createElement("div");
-    loading.className = "empty-state";
-    loading.textContent = "Loading posts...";
-    postsList.appendChild(loading);
 
-    const { data, error } = await sb
+    for (var i = 0; i < 3; i++) {
+        var skeleton = document.createElement('div');
+        skeleton.className = 'skeleton-card';
+        skeleton.innerHTML =
+            '<div class="skeleton-votes"></div>' +
+            '<div class="skeleton-content">' +
+                '<div class="skeleton-line short"></div>' +
+                '<div class="skeleton-line title"></div>' +
+                '<div class="skeleton-line long"></div>' +
+                '<div class="skeleton-line medium"></div>' +
+            '</div>';
+        postsList.appendChild(skeleton);
+    }
+
+    updateFeedToolbar();
+
+    var { data, error } = await sb
         .from("community_posts")
-        .select(`*, profiles!fk_community_posts_user_id(display_name, username, role, extra_tags)`)
+        .select('*, profiles!fk_community_posts_user_id(display_name, username, role, extra_tags, avatar_url)')
         .order("pinned", { ascending: false })
         .order("created_at", { ascending: false });
 
-    postsList.innerHTML = "";
-
     if (error) {
         console.error(error);
-        const errDiv = document.createElement("div");
+        postsList.innerHTML = "";
+        var errDiv = document.createElement("div");
         errDiv.className = "empty-state";
         errDiv.textContent = "Could not load community posts.";
         postsList.appendChild(errDiv);
@@ -843,66 +1275,119 @@ async function renderFeed() {
     posts = data || [];
 
     if (posts.length === 0) {
-        const empty = document.createElement("div");
+        postsList.innerHTML = "";
+        var empty = document.createElement("div");
         empty.className = "empty-state";
         empty.textContent = "No posts yet. Be the first!";
         postsList.appendChild(empty);
         return;
     }
 
-    posts.forEach(post => buildPostCard(post, postsList));
+    var postIds = posts.map(function(p) { return p.id; });
+    await Promise.all([
+        fetchUserVotes(postIds),
+        fetchVoteCounts(postIds)
+    ]);
+
+    postsList.innerHTML = "";
+    sortAndRenderPosts();
 }
 
 // ============================================================
-// BUILD POST CARD (updated with images, edit, tooltips)
+// BUILD POST CARD
 // ============================================================
 
-async function buildPostCard(post, container) {
-    const card = document.createElement("div");
+function buildPostCard(post, container) {
+    var card = document.createElement("div");
     card.className = "post-card" + (post.pinned ? " pinned" : "");
+    card.dataset.postId = post.id;
 
-    const header = document.createElement("div");
-    header.className = "post-card-header";
+    var votes = postVoteCounts[post.id] || { upvotes: 0, downvotes: 0, net: 0 };
+    var userVote = userVotes[post.id] || 0;
+    var netVotes = votes.net;
 
-    if (post.pinned) {
-        const pinBadge = document.createElement("span");
-        pinBadge.className = "pin-badge";
-        pinBadge.textContent = "📌 Pinned";
-        header.appendChild(pinBadge);
+    // Vote section
+    var votesSection = document.createElement("div");
+    votesSection.className = "post-card-votes";
+
+    var voteContainer = document.createElement("div");
+    voteContainer.className = "vote-container";
+
+    var upvoteBtn = document.createElement("button");
+    upvoteBtn.className = "vote-btn upvote" + (userVote === 1 ? " active" : "");
+    upvoteBtn.innerHTML = "↑";
+    upvoteBtn.title = "Upvote";
+    upvoteBtn.addEventListener("click", function() { handleVote(post.id, 1); });
+
+    var voteCount = document.createElement("div");
+    voteCount.className = "vote-count " + (netVotes > 0 ? "positive" : netVotes < 0 ? "negative" : "zero");
+    voteCount.textContent = netVotes > 0 ? "+" + netVotes : String(netVotes);
+
+    var downvoteBtn = document.createElement("button");
+    downvoteBtn.className = "vote-btn downvote" + (userVote === -1 ? " active" : "");
+    downvoteBtn.innerHTML = "↓";
+    downvoteBtn.title = "Downvote";
+    downvoteBtn.addEventListener("click", function() { handleVote(post.id, -1); });
+
+    voteContainer.append(upvoteBtn, voteCount, downvoteBtn);
+    votesSection.appendChild(voteContainer);
+
+    // Content wrapper
+    var contentWrapper = document.createElement("div");
+    contentWrapper.className = "post-card-content-wrapper";
+
+    // Meta row
+    var metaRow = document.createElement("div");
+    metaRow.className = "post-card-meta";
+
+    var authorInfo = document.createElement("div");
+    authorInfo.className = "post-card-author-info";
+
+    var miniAvatar = document.createElement("div");
+    miniAvatar.className = "post-card-mini-avatar";
+    if (post.profiles?.avatar_url) {
+        miniAvatar.style.backgroundImage = 'url(' + post.profiles.avatar_url + ')';
+        miniAvatar.textContent = '';
+    } else {
+        miniAvatar.textContent = getInitial(post.profiles?.display_name || post.profiles?.username);
     }
 
-    const authorLink = document.createElement("a");
-    authorLink.className = "post-author-link";
+    var authorLink = document.createElement("a");
+    authorLink.className = "post-card-author-name";
     authorLink.href = "#";
     authorLink.textContent = post.profiles?.display_name || "Unknown";
-    authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
-    header.appendChild(authorLink);
+    authorLink.addEventListener("click", function(e) { e.preventDefault(); openProfile(post.user_id); });
+
+    authorInfo.append(miniAvatar, authorLink);
+    metaRow.appendChild(authorInfo);
 
     if (post.profiles) {
-        const badgeWrap = document.createElement("span");
+        var badgeWrap = document.createElement("span");
         badgeWrap.className = "member-badges";
         renderBadges(badgeWrap, post.profiles);
-        header.appendChild(badgeWrap);
+        metaRow.appendChild(badgeWrap);
     }
 
-    const catSpan = document.createElement("span");
+    var catSpan = document.createElement("span");
     catSpan.className = "post-card-category";
     catSpan.textContent = post.category;
-    header.appendChild(catSpan);
+    metaRow.appendChild(catSpan);
 
-    const h3 = document.createElement("h3");
+    // Title
+    var h3 = document.createElement("h3");
     h3.textContent = post.title;
 
-    const contentP = document.createElement("p");
-    contentP.className = "post-card-content";
+    // Content
+    var contentP = document.createElement("p");
+    contentP.className = "post-card-text";
     contentP.textContent = post.content;
 
-    // --- Images ---
-    const imagesDiv = document.createElement("div");
-    imagesDiv.className = "post-images";
+    // Images
+    var imagesDiv = document.createElement("div");
+    imagesDiv.className = "post-card-images";
     if (post.images && post.images.length) {
-        post.images.forEach(url => {
-            const img = document.createElement("img");
+        post.images.forEach(function(url) {
+            var img = document.createElement("img");
             img.src = url;
             img.alt = "Post image";
             img.loading = "lazy";
@@ -910,1050 +1395,62 @@ async function buildPostCard(post, container) {
         });
     }
 
-    const date = document.createElement("div");
-    date.className = "post-card-date";
-    date.textContent = formatDate(new Date(post.created_at).getTime());
+    // Footer
+    var footer = document.createElement("div");
+    footer.className = "post-card-footer";
 
-    card.append(header, h3, contentP, imagesDiv, date);
+    var timestamp = document.createElement("span");
+    timestamp.className = "post-card-timestamp";
+    timestamp.textContent = formatDate(new Date(post.created_at).getTime());
 
-    // --- Actions ---
-    const actions = document.createElement("div");
+    var actions = document.createElement("div");
     actions.className = "post-card-actions";
 
-    // Edit button
-    if (canEditPost(post)) {
-        const editBtn = document.createElement("button");
-        editBtn.className = "btn btn-sm";
-        editBtn.textContent = "✎ Edit";
-        editBtn.addEventListener("click", () => openPostEditorForEdit(post));
-        actions.appendChild(editBtn);
+    if (post.pinned) {
+        var pinBadge = document.createElement("span");
+        pinBadge.className = "pin-badge";
+        pinBadge.textContent = "📌 Pinned";
+        actions.appendChild(pinBadge);
     }
 
-    // Pin (Admin/Owner)
+    if (canEditPost(post)) {
+        var editPostBtn = document.createElement("button");
+        editPostBtn.className = "btn btn-sm";
+        editPostBtn.textContent = "✎ Edit";
+        editPostBtn.addEventListener("click", function() { openPostEditorForEdit(post); });
+        actions.appendChild(editPostBtn);
+    }
+
     if (isAdminOrOwner(currentProfile)) {
-        const pinBtn = document.createElement("button");
+        var pinBtn = document.createElement("button");
         pinBtn.className = "btn btn-sm btn-pin";
         pinBtn.textContent = post.pinned ? "Unpin" : "📌 Pin";
-        pinBtn.addEventListener("click", async () => {
+        pinBtn.addEventListener("click", async function() {
             pinBtn.disabled = true;
             await togglePin(post.id, !post.pinned);
         });
         actions.appendChild(pinBtn);
     }
 
-    // Delete
     if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
-        const delBtn = document.createElement("button");
+        var delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger btn-sm";
         delBtn.textContent = "Delete";
-        delBtn.addEventListener("click", () => {
-            let confirmBar = card.querySelector(".delete-confirm");
-            if (confirmBar) return confirmBar.remove();
-
-            confirmBar = document.createElement("div");
-            confirmBar.className = "delete-confirm";
-
-            const text = document.createElement("span");
-            text.textContent = `Delete "${post.title}"? This cannot be undone.`;
-
-            const yesBtn = document.createElement("button");
-            yesBtn.className = "btn btn-danger";
-            yesBtn.textContent = "Yes, delete";
-            yesBtn.addEventListener("click", async () => {
-                yesBtn.disabled = true;
-                yesBtn.textContent = "Deleting...";
-                await deletePost(post.id);
-            });
-
-            const noBtn = document.createElement("button");
-            noBtn.className = "btn";
-            noBtn.textContent = "Cancel";
-            noBtn.addEventListener("click", () => confirmBar.remove());
-
-            confirmBar.append(text, yesBtn, noBtn);
-            actions.appendChild(confirmBar);
+        delBtn.addEventListener("click", function() {
+            showDeleteDialog(
+                "Delete Post",
+                'Are you sure you want to delete "' + post.title + '"? This action cannot be undone.',
+                async function() { await deletePost(post.id); }
+            );
         });
         actions.appendChild(delBtn);
     }
 
-    if (actions.children.length) card.appendChild(actions);
+    footer.append(timestamp, actions);
 
-    // --- Comments section ---
-    const commentsSection = document.createElement("div");
+    contentWrapper.append(metaRow, h3, contentP, imagesDiv, footer);
+
+    // Comments section
+    var commentsSection = document.createElement("div");
     commentsSection.className = "comments-section";
-
-    const toggleBtn = document.createElement("button");
-    toggleBtn.className = "comments-toggle-btn";
-    toggleBtn.textContent = "💬 Show comments";
-    let commentsLoaded = false;
-    let commentsOpen   = false;
-
-    const commentsList = document.createElement("div");
-    commentsList.className = "comments-list hidden";
-
-    const composer = document.createElement("div");
-    composer.className = "comment-composer";
-
-    const textarea = document.createElement("textarea");
-    textarea.className = "comment-textarea";
-    textarea.placeholder = "Write a comment...";
-    textarea.rows = 2;
-
-    const submitBtn = document.createElement("button");
-    submitBtn.className = "btn btn-primary btn-sm";
-    submitBtn.textContent = "Post comment";
-
-    submitBtn.addEventListener("click", async () => {
-        const text = textarea.value.trim();
-        if (!text) return;
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Posting...";
-
-        const { error } = await sb.from("post_comments").insert({
-            post_id:  post.id,
-            user_id:  currentUser.id,
-            content:  text
-        });
-
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Post comment";
-
-        if (error) {
-            alert("Could not post comment: " + error.message);
-            return;
-        }
-
-        textarea.value = "";
-        await loadComments(post.id, commentsList);
-    });
-
-    composer.append(textarea, submitBtn);
-
-    toggleBtn.addEventListener("click", async () => {
-        commentsOpen = !commentsOpen;
-        if (commentsOpen) {
-            commentsList.classList.remove("hidden");
-            composer.classList.remove("hidden");
-            if (!commentsLoaded) {
-                await loadComments(post.id, commentsList);
-                commentsLoaded = true;
-            }
-            toggleBtn.textContent = "💬 Hide comments";
-        } else {
-            commentsList.classList.add("hidden");
-            composer.classList.add("hidden");
-            toggleBtn.textContent = "💬 Show comments";
-        }
-    });
-
-    composer.classList.add("hidden");
-    commentsSection.append(toggleBtn, commentsList, composer);
-    card.appendChild(commentsSection);
-    container.appendChild(card);
-}
-
-// ============================================================
-// LOAD COMMENTS (updated with edit, delete, "edited" label)
-// ============================================================
-
-async function loadComments(postId, listEl) {
-    listEl.innerHTML = `<div class="comment-loading">Loading...</div>`;
-
-    const { data, error } = await sb
-        .from("post_comments")
-        .select(`*, profiles!post_comments_user_id_fkey(display_name, username, role, extra_tags)`)
-        .eq("post_id", postId)
-        .order("created_at", { ascending: true });
-
-    listEl.innerHTML = "";
-
-    if (error) {
-        listEl.innerHTML = `<div class="comment-loading">Could not load comments.</div>`;
-        console.error(error);
-        return;
-    }
-
-    if (!data || data.length === 0) {
-        listEl.innerHTML = `<div class="comment-loading">No comments yet. Be the first!</div>`;
-        return;
-    }
-
-    data.forEach(comment => {
-        const el = document.createElement("div");
-        el.className = "comment";
-
-        const commentHeader = document.createElement("div");
-        commentHeader.className = "comment-header";
-
-        const avatar = document.createElement("div");
-        avatar.className = "comment-avatar";
-        avatar.textContent = getInitial(comment.profiles?.display_name || comment.profiles?.username);
-
-        const authorLink = document.createElement("a");
-        authorLink.className = "post-author-link";
-        authorLink.href = "#";
-        authorLink.textContent = comment.profiles?.display_name || "Unknown";
-        authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(comment.user_id); });
-
-        const badges = document.createElement("span");
-        badges.className = "member-badges";
-        if (comment.profiles) renderBadges(badges, comment.profiles);
-
-        const dateSpan = document.createElement("span");
-        dateSpan.className = "comment-date";
-        dateSpan.textContent = formatDate(new Date(comment.created_at).getTime());
-
-        if (comment.updated_at && new Date(comment.updated_at).getTime() > new Date(comment.created_at).getTime()) {
-            const editedSpan = document.createElement("span");
-            editedSpan.className = "comment-edited-label";
-            editedSpan.textContent = "(edited)";
-            dateSpan.appendChild(editedSpan);
-        }
-
-        commentHeader.append(avatar, authorLink, badges, dateSpan);
-
-        const body = document.createElement("div");
-        body.className = "comment-body";
-        body.textContent = comment.content;
-
-        el.append(commentHeader, body);
-
-        // Actions
-        const actions = document.createElement("div");
-        actions.className = "post-card-actions";
-        actions.style.marginTop = "8px";
-
-        if (canEditComment(comment)) {
-            const editBtn = document.createElement("button");
-            editBtn.className = "btn btn-sm";
-            editBtn.textContent = "✎ Edit";
-            editBtn.addEventListener("click", () => {
-                const editForm = document.createElement("div");
-                editForm.className = "comment-edit-form";
-                const textarea = document.createElement("textarea");
-                textarea.value = comment.content;
-                textarea.rows = 3;
-                const saveEditBtn = document.createElement("button");
-                saveEditBtn.className = "btn btn-primary btn-sm";
-                saveEditBtn.textContent = "Save";
-                const cancelEditBtn = document.createElement("button");
-                cancelEditBtn.className = "btn btn-sm";
-                cancelEditBtn.textContent = "Cancel";
-                const actionsRow = document.createElement("div");
-                actionsRow.className = "editor-actions";
-                actionsRow.append(saveEditBtn, cancelEditBtn);
-                editForm.append(textarea, actionsRow);
-
-                el.replaceChild(editForm, body);
-                textarea.focus();
-
-                saveEditBtn.addEventListener("click", async () => {
-                    const newContent = textarea.value.trim();
-                    if (!newContent) return;
-                    saveEditBtn.disabled = true;
-                    saveEditBtn.textContent = "Saving...";
-                    const { error } = await sb.from("post_comments")
-                        .update({ content: newContent, updated_at: new Date().toISOString() })
-                        .eq("id", comment.id);
-                    saveEditBtn.disabled = false;
-                    saveEditBtn.textContent = "Save";
-                    if (error) {
-                        alert("Could not update comment: " + error.message);
-                        return;
-                    }
-                    await loadComments(postId, listEl);
-                });
-
-                cancelEditBtn.addEventListener("click", () => {
-                    loadComments(postId, listEl);
-                });
-            });
-            actions.appendChild(editBtn);
-        }
-
-        if (comment.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
-            const delBtn = document.createElement("button");
-            delBtn.className = "btn btn-danger btn-sm comment-delete-btn";
-            delBtn.textContent = "✕";
-            delBtn.title = "Delete comment";
-            delBtn.addEventListener("click", async () => {
-                let confirmBar = el.querySelector(".delete-confirm");
-                if (confirmBar) return confirmBar.remove();
-
-                confirmBar = document.createElement("div");
-                confirmBar.className = "delete-confirm";
-
-                const text = document.createElement("span");
-                text.textContent = "Delete this comment?";
-
-                const yesBtn = document.createElement("button");
-                yesBtn.className = "btn btn-danger btn-sm";
-                yesBtn.textContent = "Yes, delete";
-                yesBtn.addEventListener("click", async () => {
-                    yesBtn.disabled = true;
-                    yesBtn.textContent = "Deleting...";
-                    const { error } = await sb.from("post_comments").delete().eq("id", comment.id);
-                    if (error) { alert(error.message); yesBtn.disabled = false; yesBtn.textContent = "Yes, delete"; return; }
-                    await loadComments(postId, listEl);
-                });
-
-                const noBtn = document.createElement("button");
-                noBtn.className = "btn btn-sm";
-                noBtn.textContent = "Cancel";
-                noBtn.addEventListener("click", () => confirmBar.remove());
-
-                confirmBar.append(text, yesBtn, noBtn);
-                el.appendChild(confirmBar);
-            });
-            actions.appendChild(delBtn);
-        }
-
-        if (actions.children.length) el.appendChild(actions);
-        listEl.appendChild(el);
-    });
-}
-
-// ============================================================
-// TOGGLE PIN, DELETE POST
-// ============================================================
-
-async function togglePin(postId, pinned) {
-    const { error } = await sb.from("community_posts").update({ pinned }).eq("id", postId);
-    if (error) {
-        alert("Could not update pin: " + error.message);
-        return;
-    }
-    await renderFeed();
-}
-
-async function deletePost(postId) {
-    await sb.from("community_posts").delete().eq("id", postId);
-    renderFeed();
-}
-
-// ============================================================
-// NEW POST / EDIT POST
-// ============================================================
-
-newPostBtn.addEventListener("click", () => {
-    postTitleInput.value = "";
-    postCategoryInput.value = "Discussion";
-    postContentInput.value = "";
-    postImageFiles = [];
-    postImagePreviews.innerHTML = "";
-    postImageUploadStatus.textContent = "";
-    postEditor.dataset.editPostId = '';
-    savePostBtn.textContent = 'Post';
-    savePostBtn.onclick = createNewPost;
-    document.querySelector('#postEditor h2').textContent = 'New Post';
-    showCommunitySection(postEditor);
-    postTitleInput.focus();
-});
-
-cancelPostBtn.addEventListener("click", () => {
-    postEditor.dataset.editPostId = '';
-    savePostBtn.textContent = 'Post';
-    savePostBtn.onclick = createNewPost;
-    showCommunitySection(communityFeed);
-});
-
-async function createNewPost() {
-    const title = postTitleInput.value.trim();
-    if (!title) return;
-
-    savePostBtn.disabled = true;
-    savePostBtn.textContent = "Posting...";
-
-    try {
-        const { error } = await sb.from("community_posts").insert({
-            user_id: currentUser.id,
-            title,
-            category: postCategoryInput.value,
-            content: postContentInput.value.trim(),
-            images: postImageFiles.length ? postImageFiles : null
-        });
-        if (error) throw error;
-
-        showCommunitySection(communityFeed);
-        await renderFeed();
-    } catch (err) {
-        alert("Could not post: " + (err.message || "unknown error"));
-    } finally {
-        savePostBtn.disabled = false;
-        savePostBtn.textContent = "Post";
-    }
-}
-
-async function openPostEditorForEdit(post) {
-    showCommunitySection(postEditor);
-    document.querySelector('#postEditor h2').textContent = 'Edit Post';
-    postTitleInput.value = post.title;
-    postCategoryInput.value = post.category;
-    postContentInput.value = post.content;
-    loadPostImages(post.images || []);
-    postEditor.dataset.editPostId = post.id;
-    savePostBtn.textContent = 'Update Post';
-    savePostBtn.onclick = async () => {
-        await updatePost(post.id);
-    };
-}
-
-async function updatePost(postId) {
-    const title = postTitleInput.value.trim();
-    if (!title) return;
-
-    savePostBtn.disabled = true;
-    savePostBtn.textContent = 'Updating...';
-
-    try {
-        const { error } = await sb.from('community_posts')
-            .update({
-                title,
-                category: postCategoryInput.value,
-                content: postContentInput.value.trim(),
-                images: postImageFiles.length ? postImageFiles : null,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', postId);
-        if (error) throw error;
-
-        postEditor.dataset.editPostId = '';
-        savePostBtn.textContent = 'Post';
-        savePostBtn.onclick = createNewPost;
-        showCommunitySection(communityFeed);
-        await renderFeed();
-    } catch (err) {
-        alert("Could not update: " + (err.message || "unknown error"));
-    } finally {
-        savePostBtn.disabled = false;
-        savePostBtn.textContent = 'Update Post';
-    }
-}
-
-// Set default save button handler
-savePostBtn.onclick = createNewPost;
-
-// ============================================================
-// MEMBERS & PROFILE (with avatar support)
-// ============================================================
-
-async function fetchMembers() {
-    const { data, error } = await sb.from("profiles").select("*").order("joined_at", { ascending: true });
-    if (error) console.error(error);
-    return (data || []).map(m => ({ ...m, extra_tags: Array.isArray(m.extra_tags) ? m.extra_tags : [] }));
-}
-
-async function fetchStats() {
-    const { data, error } = await sb.from("profile_stats").select("*");
-    if (error) return console.error(error);
-    profileStatsMap = {};
-    (data || []).forEach(row => profileStatsMap[row.id] = row);
-}
-
-// --- renderMembers (with avatar) ---
-async function renderMembers() {
-    membersList.innerHTML = "";
-    const loading = document.createElement("div");
-    loading.className = "empty-state";
-    loading.textContent = "Loading members...";
-    membersList.appendChild(loading);
-
-    members = await fetchMembers();
-    await fetchStats();
-    membersList.innerHTML = "";
-
-    if (members.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "empty-state";
-        empty.textContent = "No members found.";
-        membersList.appendChild(empty);
-        return;
-    }
-
-    const roleOrder = { Owner: 0, Admin: 1 };
-    const sorted = [...members].sort((a, b) => {
-        const ra = roleOrder[a.role] ?? 2;
-        const rb = roleOrder[b.role] ?? 2;
-        if (ra !== rb) return ra - rb;
-        return new Date(a.joined_at) - new Date(b.joined_at);
-    });
-
-    sorted.forEach(member => {
-        const card = document.createElement("div");
-        card.className = "member-card";
-
-        const header = document.createElement("div");
-        header.className = "member-card-header";
-
-        const avatar = document.createElement("div");
-        avatar.className = "member-avatar";
-        if (member.avatar_url) {
-            avatar.style.backgroundImage = `url(${member.avatar_url})`;
-            avatar.style.backgroundSize = 'cover';
-            avatar.style.backgroundPosition = 'center';
-            avatar.textContent = '';
-        } else {
-            avatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
-            avatar.textContent = getInitial(member.display_name || member.username);
-        }
-
-        const nameWrap = document.createElement("div");
-        const name = document.createElement("div");
-        name.className = "member-card-name";
-        name.textContent = member.display_name || member.username || "Unknown";
-
-        const username = document.createElement("div");
-        username.className = "member-card-username";
-        username.textContent = "@" + (member.username || "unknown");
-
-        nameWrap.appendChild(name);
-        nameWrap.appendChild(username);
-        header.appendChild(avatar);
-        header.appendChild(nameWrap);
-
-        const badges = document.createElement("div");
-        badges.className = "member-badges";
-        renderBadges(badges, member);
-        card.appendChild(header);
-        card.appendChild(badges);
-
-        if (member.bio) {
-            const bio = document.createElement("div");
-            bio.className = "member-card-bio";
-            bio.textContent = member.bio;
-            card.appendChild(bio);
-        }
-
-        card.addEventListener("click", () => openProfile(member.id));
-        membersList.appendChild(card);
-    });
-}
-
-// --- openProfile ---
-async function openProfile(userId) {
-    viewingProfileId = userId;
-
-    const { data: profile, error } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
-    if (error || !profile) { alert("Profile not found."); return; }
-    if (!Array.isArray(profile.extra_tags)) profile.extra_tags = [];
-
-    const idx = members.findIndex(m => m.id === userId);
-    if (idx !== -1) members[idx] = profile;
-
-    const avatarContainer = profileAvatar;
-    avatarContainer.innerHTML = '';
-    if (profile.avatar_url) {
-        const img = document.createElement('img');
-        img.src = profile.avatar_url;
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'cover';
-        img.style.borderRadius = '50%';
-        avatarContainer.appendChild(img);
-    } else {
-        avatarContainer.textContent = getInitial(profile.display_name || profile.username);
-        avatarContainer.style.display = 'flex';
-        avatarContainer.style.alignItems = 'center';
-        avatarContainer.style.justifyContent = 'center';
-        avatarContainer.style.fontSize = '2rem';
-        avatarContainer.style.fontWeight = '700';
-        avatarContainer.style.color = '#0a0f1e';
-    }
-
-    profileDisplayName.textContent = profile.display_name || profile.username || "Unknown";
-    profileUsername.textContent = "@" + (profile.username || "unknown");
-    renderBadges(profileBadges, profile);
-    profileBio.textContent = profile.bio || (userId === currentUser.id ? "No bio yet. Edit your profile." : "No bio yet.");
-
-    if (!profileStatsMap[userId]) await fetchStats();
-    const stats = profileStatsMap[userId] || { post_count: 0 };
-    profileStats.innerHTML = `<div class="profile-stat"><span class="profile-stat-value">${stats.post_count}</span><span class="profile-stat-label">Posts</span></div>`;
-
-    const joinDate = new Date(profile.joined_at);
-    profileMeta.textContent = "Joined " + joinDate.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-
-    editProfileBtn.classList.toggle("hidden", userId !== currentUser.id);
-    showCommunitySection(profileView);
-}
-
-profileBackBtn.addEventListener("click", () => setCommunitySubview(communitySubview === "admin" ? "admin" : "members"));
-profileEditBackBtn.addEventListener("click", () => openProfile(currentUser.id));
-
-editProfileBtn.addEventListener("click", () => {
-    editDisplayName.value = currentProfile.display_name || "";
-    editUsername.value    = currentProfile.username || "";
-    editBio.value         = currentProfile.bio || "";
-    if (currentProfile.avatar_url) {
-        document.getElementById('avatarPreviewImg').src = currentProfile.avatar_url;
-    }
-    profileEditError.classList.add("hidden");
-    showCommunitySection(profileEditView);
-});
-
-saveProfileBtn.addEventListener("click", async () => {
-    const displayName = editDisplayName.value.trim();
-    const username    = editUsername.value.trim();
-    const bio         = editBio.value.trim();
-
-    if (!displayName || !username) {
-        profileEditError.textContent = "Display name and username are required.";
-        profileEditError.classList.remove("hidden");
-        return;
-    }
-
-    saveProfileBtn.disabled = true;
-    saveProfileBtn.textContent = "Saving...";
-
-    const { error } = await sb.from("profiles").update({
-        display_name: displayName,
-        username,
-        bio,
-        updated_at: new Date().toISOString()
-    }).eq("id", currentUser.id);
-
-    saveProfileBtn.disabled = false;
-    saveProfileBtn.textContent = "Save";
-
-    if (error) {
-        profileEditError.textContent = error.message;
-        profileEditError.classList.remove("hidden");
-        return;
-    }
-
-    currentProfile.display_name = displayName;
-    currentProfile.username     = username;
-    currentProfile.bio          = bio;
-    updateAccountUI();
-    await openProfile(currentUser.id);
-});
-
-// ============================================================
-// ADMIN PANEL
-// ============================================================
-
-// --- renderAdminCard (NEW) ---
-function renderAdminCard(member, isOwner) {
-    const card = document.createElement("div");
-    card.className = "admin-member-card";
-    card.dataset.memberId = member.id;
-
-    const header = document.createElement("div");
-    header.className = "admin-member-header";
-
-    const identity = document.createElement("div");
-    identity.className = "admin-member-identity";
-
-    const avatar = document.createElement("div");
-    avatar.className = "member-avatar";
-    if (member.avatar_url) {
-        avatar.style.backgroundImage = `url(${member.avatar_url})`;
-        avatar.style.backgroundSize = 'cover';
-        avatar.style.backgroundPosition = 'center';
-        avatar.textContent = '';
-    } else {
-        avatar.style.background = 'linear-gradient(135deg, #60a5fa, #fbbf24)';
-        avatar.textContent = getInitial(member.display_name || member.username);
-    }
-
-    const nameWrap = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "member-card-name";
-    name.textContent = member.display_name || member.username || "Unknown";
-
-    const badges = document.createElement("div");
-    badges.className = "member-badges";
-    renderBadges(badges, member);
-
-    nameWrap.appendChild(name);
-    nameWrap.appendChild(badges);
-    identity.appendChild(avatar);
-    identity.appendChild(nameWrap);
-
-    const controls = document.createElement("div");
-    controls.className = "admin-role-controls";
-
-    const statusLabel = document.createElement("span");
-    statusLabel.className = "admin-save-status";
-    statusLabel.style.cssText = "font-size:.8rem;color:#4ade80;display:none;";
-
-    function showStatus(msg, ok = true) {
-        statusLabel.textContent = msg;
-        statusLabel.style.color = ok ? "#4ade80" : "#f87171";
-        statusLabel.style.display = "inline";
-        setTimeout(() => { statusLabel.style.display = "none"; }, 3000);
-    }
-
-    const roleSelect = document.createElement("select");
-    const availableRoles = isOwner ? ROLE_OPTIONS : ROLE_OPTIONS.filter(r => r !== "Admin" && r !== "Owner");
-    const rolesToShow = availableRoles.includes(member.role) ? availableRoles : [...availableRoles, member.role];
-    rolesToShow.forEach(role => {
-        const opt = document.createElement("option");
-        opt.value = role;
-        opt.textContent = role;
-        if (role === member.role) opt.selected = true;
-        roleSelect.appendChild(opt);
-    });
-    const canChangeRole = isOwner && member.id !== currentUser.id;
-    if (!canChangeRole) roleSelect.disabled = true;
-
-    roleSelect.addEventListener("change", async () => {
-        const newRole = roleSelect.value;
-        const prevRole = member.role;
-        roleSelect.disabled = true;
-        const { data: saved, error } = await sb
-            .from("profiles")
-            .update({ role: newRole })
-            .eq("id", member.id)
-            .select("role, extra_tags")
-            .single();
-        roleSelect.disabled = false;
-        if (error) {
-            showStatus("❌ " + (error.message || "Save failed"), false);
-            roleSelect.value = prevRole;
-            return;
-        }
-        member.role = saved.role;
-        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
-        renderBadges(badges, member);
-        showStatus("✓ Role saved");
-        if (member.id === currentUser.id) {
-            currentProfile.role = member.role;
-            updateAccountUI();
-        }
-    });
-    controls.appendChild(roleSelect);
-
-    const tagSelect = document.createElement("select");
-    const blankOpt = document.createElement("option");
-    blankOpt.value = "";
-    blankOpt.textContent = "+ Add tag";
-    tagSelect.appendChild(blankOpt);
-
-    const canModifyTags = isOwner || (isAdminOrOwner(currentProfile) && member.role === "Member");
-    if (!canModifyTags) tagSelect.disabled = true;
-
-    function rebuildTagSelect() {
-        while (tagSelect.options.length > 1) tagSelect.remove(1);
-        TAG_OPTIONS.forEach(tag => {
-            if (!(member.extra_tags || []).includes(tag)) {
-                const opt = document.createElement("option");
-                opt.value = tag;
-                opt.textContent = tag;
-                tagSelect.appendChild(opt);
-            }
-        });
-    }
-    rebuildTagSelect();
-
-    tagSelect.addEventListener("change", async () => {
-        const tag = tagSelect.value;
-        if (!tag) return;
-        const newTags = [...(member.extra_tags || []), tag];
-        tagSelect.disabled = true;
-        const { data: saved, error } = await sb
-            .from("profiles")
-            .update({ extra_tags: newTags })
-            .eq("id", member.id)
-            .select("role, extra_tags")
-            .single();
-        tagSelect.disabled = false;
-        tagSelect.value = "";
-        if (error) {
-            showStatus("❌ " + (error.message || "Save failed"), false);
-            return;
-        }
-        member.extra_tags = Array.isArray(saved.extra_tags) ? saved.extra_tags : [];
-        renderBadges(badges, member);
-        rebuildTagSelect();
-        rebuildTagList();
-        showStatus("✓ Tag added");
-    });
-    controls.appendChild(tagSelect);
-
-    const tagListContainer = document.createElement("div");
-    tagListContainer.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%;";
-
-    function rebuildTagList() {
-        tagListContainer.innerHTML = "";
-        const tags = member.extra_tags || [];
-        if (tags.length === 0) {
-            const emptyMsg = document.createElement("div");
-            emptyMsg.textContent = "No custom badges";
-            emptyMsg.style.cssText = "color:#64748b; font-size:0.75rem;";
-            tagListContainer.appendChild(emptyMsg);
-            return;
-        }
-        tags.forEach((tag, idx) => {
-            const row = document.createElement("div");
-            row.style.cssText = "display:flex;align-items:center;gap:8px;";
-
-            const upBtn = document.createElement("button");
-            upBtn.textContent = "▲";
-            upBtn.className = "btn btn-sm";
-            upBtn.style.padding = "2px 6px";
-            upBtn.disabled = idx === 0 || !canModifyTags;
-            upBtn.addEventListener("click", async () => {
-                if (idx === 0 || !canModifyTags) return;
-                const newTags = [...tags];
-                [newTags[idx - 1], newTags[idx]] = [newTags[idx], newTags[idx - 1]];
-                await saveTagOrder(newTags);
-            });
-
-            const downBtn = document.createElement("button");
-            downBtn.textContent = "▼";
-            downBtn.className = "btn btn-sm";
-            downBtn.style.padding = "2px 6px";
-            downBtn.disabled = idx === tags.length - 1 || !canModifyTags;
-            downBtn.addEventListener("click", async () => {
-                if (idx === tags.length - 1 || !canModifyTags) return;
-                const newTags = [...tags];
-                [newTags[idx], newTags[idx + 1]] = [newTags[idx + 1], newTags[idx]];
-                await saveTagOrder(newTags);
-            });
-
-            const tagSpan = document.createElement("span");
-            tagSpan.textContent = tag;
-            tagSpan.className = "badge badge-custom";
-            tagSpan.style.backgroundColor = "rgba(129,140,248,.1)";
-            tagSpan.style.color = "#818cf8";
-            tagSpan.style.padding = "2px 8px";
-
-            const removeBtn = document.createElement("button");
-            removeBtn.textContent = "✕";
-            removeBtn.className = "btn btn-danger btn-sm";
-            removeBtn.style.padding = "2px 6px";
-            removeBtn.disabled = !canModifyTags;
-            removeBtn.addEventListener("click", async () => {
-                if (!canModifyTags) return;
-                const newTags = tags.filter(t => t !== tag);
-                await saveTagOrder(newTags);
-            });
-
-            row.append(upBtn, downBtn, tagSpan, removeBtn);
-            tagListContainer.appendChild(row);
-        });
-    }
-
-    async function saveTagOrder(newTags) {
-        member.extra_tags = newTags;
-        renderBadges(badges, member);
-        rebuildTagList();
-        rebuildTagSelect();
-        const { error } = await sb
-            .from("profiles")
-            .update({ extra_tags: newTags })
-            .eq("id", member.id);
-        if (error) {
-            console.error("Tag reorder error:", error);
-            showStatus("❌ Failed to save order", false);
-            const { data: fresh } = await sb.from("profiles").select("*").eq("id", member.id).single();
-            if (fresh) {
-                member.extra_tags = Array.isArray(fresh.extra_tags) ? fresh.extra_tags : [];
-                renderBadges(badges, member);
-                rebuildTagList();
-                rebuildTagSelect();
-            }
-        } else {
-            showStatus("✓ Order saved");
-        }
-    }
-
-    rebuildTagList();
-    controls.appendChild(tagListContainer);
-    controls.appendChild(statusLabel);
-
-    const viewBtn = document.createElement("button");
-    viewBtn.className = "btn btn-sm";
-    viewBtn.textContent = "View Profile";
-    viewBtn.addEventListener("click", () => openProfile(member.id));
-    controls.appendChild(viewBtn);
-
-    header.appendChild(identity);
-    header.appendChild(controls);
-    card.appendChild(header);
-    adminMembersList.appendChild(card);
-}
-
-// --- renderAdminPanel ---
-async function renderAdminPanel() {
-    adminMembersList.innerHTML = "";
-    const loading = document.createElement("div");
-    loading.className = "empty-state";
-    loading.textContent = "Loading members...";
-    adminMembersList.appendChild(loading);
-
-    members = await fetchMembers();
-    adminMembersList.innerHTML = "";
-
-    const isOwner = isOwnerUser(currentProfile);
-
-    members.forEach(member => renderAdminCard(member, isOwner));
-}
-
-// ============================================================
-// PAGE FUNCTIONS
-// ============================================================
-
-function openPage(id) {
-    const p = pages.find(pg => pg.id === id);
-    if (!p) return;
-
-    currentPageId = id;
-    pageTitleDisplay.textContent = p.title;
-    pageMeta.textContent = `${p.category} · Created ${formatDate(p.created)} · Updated ${formatDate(p.updated)}`;
-    pageContentDisplay.textContent = p.content;
-
-    editBtn.classList.remove("hidden");
-    deleteBtn.classList.remove("hidden");
-    showOnly(pageView);
-}
-
-function openEditor(id) {
-    if (id) {
-        const p = pages.find(pg => pg.id === id);
-        if (!p) return;
-        currentPageId = id;
-        editorHeading.textContent = "Edit Page";
-        pageTitleInput.value   = p.title;
-        pageCategoryInput.value = p.category;
-        pageContentInput.value = p.content;
-    } else {
-        currentPageId = null;
-        editorHeading.textContent = "New Page";
-        pageTitleInput.value   = "";
-        pageCategoryInput.value = activeCategory !== "All" ? activeCategory : "Ideas";
-        pageContentInput.value = "";
-    }
-    showOnly(editor);
-    pageTitleInput.focus();
-}
-
-async function savePage() {
-    const title    = pageTitleInput.value.trim();
-    const category = pageCategoryInput.value;
-    const text     = pageContentInput.value;
-
-    if (!title) return pageTitleInput.focus();
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = "Saving...";
-
-    try {
-        if (currentPageId) {
-            const { error } = await sb.from("pages").update({
-                title, category, content: text, updated_at: new Date().toISOString()
-            }).eq("id", currentPageId);
-            if (error) throw error;
-        } else {
-            const { data, error } = await sb.from("pages").insert({
-                user_id: currentUser.id, title, category, content: text
-            }).select().single();
-            if (error) throw error;
-            currentPageId = data.id;
-        }
-        await fetchPages();
-        openPage(currentPageId);
-    } catch (err) {
-        alert("Could not save: " + (err.message || "unknown error"));
-    } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = "Save";
-    }
-}
-
-async function deletePage() {
-    if (!currentPageId) return;
-    const p = pages.find(pg => pg.id === currentPageId);
-    if (!p) return;
-
-    let confirmBar = document.getElementById("deleteConfirmBar");
-    if (confirmBar) return confirmBar.remove();
-
-    confirmBar = document.createElement("div");
-    confirmBar.id = "deleteConfirmBar";
-    confirmBar.className = "delete-confirm";
-
-    const text   = document.createElement("span");
-    text.textContent = `Delete "${p.title}"? This cannot be undone.`;
-
-    const yesBtn = document.createElement("button");
-    yesBtn.className = "btn btn-danger";
-    yesBtn.textContent = "Yes, delete";
-    yesBtn.addEventListener("click", async () => {
-        yesBtn.disabled = true;
-        yesBtn.textContent = "Deleting...";
-        const { error } = await sb.from("pages").delete().eq("id", currentPageId);
-        if (error) {
-            alert("Could not delete: " + error.message);
-            yesBtn.disabled = false;
-            yesBtn.textContent = "Yes, delete";
-            return;
-        }
-        await fetchPages();
-        currentPageId = null;
-        renderHome();
-    });
-
-    const noBtn = document.createElement("button");
-    noBtn.className = "btn";
-    noBtn.textContent = "Cancel";
-    noBtn.addEventListener("click", () => confirmBar.remove());
-
-    confirmBar.append(text, yesBtn, noBtn);
-    pageView.appendChild(confirmBar);
-}
-
-newPageBtn.addEventListener("click", () => openEditor(null));
-editBtn.addEventListener("click", () => openEditor(currentPageId));
-deleteBtn.addEventListener("click", deletePage);
-closeBtn.addEventListener("click", () => { currentPageId = null; renderHome(); });
-saveBtn.addEventListener("click", savePage);
-cancelBtn.addEventListener("click", () => currentPageId ? openPage(currentPageId) : renderHome());
-
-// ============================================================
-// TOOLTIP SYSTEM
-// ============================================================
-
-function showTooltip(e, text) {
-    if (tooltipTimeout) {
-        clearTimeout(tooltipTimeout);
-        tooltipTimeout = null;
-    }
-    tooltipEl.textContent = text;
-    const rect = e.target.getBoundingClientRect();
-    tooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
-    tooltipEl.style.top = (rect.top - 10) + 'px';
-    tooltipEl.style.transform = 'translateX(-50%) translateY(-100%)';
-    tooltipEl.classList.add('visible');
-    tooltipEl.classList.remove('hidden');
-}
-
-function hideTooltip() {
-    if (tooltipTimeout) clearTimeout(tooltipTimeout);
-    tooltipTimeout = setTimeout(() => {
-        tooltipEl.classList.remove('visible');
-        tooltipEl.classList.add('hidden');
-        tooltipTimeout = null;
-    }, 150);
-}
-
-document.addEventListener('mouseover', (e) => {
-    const target = e.target.closest('[data-tooltip]');
-    if (target) {
-        const text = target.dataset.tooltip || target.textContent;
-        showTooltip(e, text);
-    }
-});
-document.addEventListener('mouseout', (e) => {
-    const target = e.target.closest('[data-tooltip]');
-    if (target) {
-        hideTooltip();
-    }
-});
-
-// ============================================================
-// INIT
-// ============================================================
-
-setAuthMode("signin");
+    commentsSection.style.margin = "0 24px 20px 24
