@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Encyclopedie</title>
     
     <link rel="icon" type="image/x-icon" href="WebsiteIcon.ico">
@@ -133,11 +133,15 @@
 
         <!-- COMMUNITY TAB -->
         <section class="hidden" id="communityTab">
-            <div class="community-subnav">
-                <button class="subnav-btn active" data-subview="feed"><span class="subnav-icon">🔥</span> Feed</button>
-                <button class="subnav-btn" data-subview="members"><span class="subnav-icon">👥</span> Members</button>
-                <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin"><span class="subnav-icon">⚙️</span> Admin</button>
+            <!-- Sub‑nav with wrapper for snap‑scroll on iOS -->
+            <div class="community-subnav-wrapper">
+                <div class="community-subnav">
+                    <button class="subnav-btn active" data-subview="feed"><span class="subnav-icon">🔥</span> Feed</button>
+                    <button class="subnav-btn" data-subview="members"><span class="subnav-icon">👥</span> Members</button>
+                    <button class="subnav-btn hidden" id="adminSubnavBtn" data-subview="admin"><span class="subnav-icon">⚙️</span> Admin</button>
+                </div>
             </div>
+
             <div class="community-section" id="communityFeed">
                 <div class="feed-toolbar"><h2 class="feed-title">Community Feed</h2><button class="btn btn-primary" id="newPostBtn">+ New Post</button></div>
                 <div class="posts-grid" id="postsList"></div>
@@ -197,5 +201,11 @@
 <!-- Tooltip container -->
 <div id="tooltip" class="tooltip hidden"></div>
 
+<script>
+    // iOS detection for snap‑scroll sub‑nav
+    if (window.Capacitor && window.Capacitor.getPlatform() === 'ios') {
+        document.body.classList.add('ios-app');
+    }
+</script>
 </body>
 </html>
