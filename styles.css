@@ -1682,3 +1682,708 @@ footer {
   background: rgba(96, 165, 250, 0.15);
   color: #60a5fa;
 }
+// ============================================================
+// GLOBAL VARIABLES - ADD THESE
+// ============================================================
+
+let postSortOrder = 'hot'; // 'hot', 'newest', 'top'
+let userVotes = {}; // Cache user's votes: { postId: voteType }
+let postVoteCounts = {}; // Cache vote counts: { postId: { upvotes, downvotes, net } }
+
+// ============================================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================================
+
+const toastContainer = document.createElement('div');
+toastContainer.className = 'toast-container';
+document.body.appendChild(toastContainer);
+
+function showToast(message, type = 'info', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    const icons = {
+        success: '✓',
+        error: '✕',
+        info: 'ℹ'
+    };
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-message">${message}</span>
+        <div class="toast-progress" style="animation-duration: ${duration}ms"></div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'toastSlideOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ============================================================
+// DELETE DIALOG SYSTEM
+// ============================================================
+
+function showDeleteDialog(title, message, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'delete-dialog-overlay';
+    
+    overlay.innerHTML = `
+        <div class="delete-dialog">
+            <div class="delete-dialog-icon">🗑️</div>
+            <h3>${title}</h3>
+            <p>${message}</p>
+            <div class="delete-dialog-actions">
+                <button class="btn" id="deleteCancelBtn">Cancel</button>
+                <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    const close = () => {
+        overlay.style.animation = 'fadeIn 0.2s ease reverse forwards';
+        setTimeout(() => overlay.remove(), 200);
+    };
+    
+    overlay.querySelector('#deleteCancelBtn').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+    
+    overlay.querySelector('#deleteConfirmBtn').addEventListener('click', async () => {
+        const confirmBtn = overlay.querySelector('#deleteConfirmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+        
+        try {
+            await onConfirm();
+            close();
+            showToast('Successfully deleted', 'success');
+        } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete';
+            showToast(err.message || 'Failed to delete', 'error');
+        }
+    });
+}
+
+// ============================================================
+// VOTE FUNCTIONS
+// ============================================================
+
+async function fetchUserVotes(postIds) {
+    if (!currentUser || !postIds.length) return;
+    
+    const { data, error } = await sb
+        .from('post_votes')
+        .select('post_id, vote_type')
+        .eq('user_id', currentUser.id)
+        .in('post_id', postIds);
+    
+    if (error) {
+        console.error('Error fetching user votes:', error);
+        return;
+    }
+    
+    userVotes = {};
+    (data || []).forEach(v => {
+        userVotes[v.post_id] = v.vote_type;
+    });
+}
+
+async function fetchVoteCounts(postIds) {
+    if (!postIds.length) return;
+    
+    const { data, error } = await sb
+        .from('post_votes')
+        .select('post_id, vote_type');
+    
+    if (error) {
+        console.error('Error fetching vote counts:', error);
+        return;
+    }
+    
+    postVoteCounts = {};
+    postIds.forEach(id => {
+        postVoteCounts[id] = { upvotes: 0, downvotes: 0, net: 0 };
+    });
+    
+    (data || []).forEach(v => {
+        if (postVoteCounts[v.post_id]) {
+            if (v.vote_type === 1) {
+                postVoteCounts[v.post_id].upvotes++;
+                postVoteCounts[v.post_id].net++;
+            } else {
+                postVoteCounts[v.post_id].downvotes++;
+                postVoteCounts[v.post_id].net--;
+            }
+        }
+    });
+}
+
+async function handleVote(postId, voteType) {
+    if (!currentUser) return;
+    
+    const currentVote = userVotes[postId];
+    let newVoteType = voteType;
+    
+    // If clicking the same vote, remove it
+    if (currentVote === voteType) {
+        newVoteType = 0; // Remove vote
+    }
+    
+    try {
+        if (currentVote) {
+            // Remove existing vote
+            const { error } = await sb
+                .from('post_votes')
+                .delete()
+                .eq('post_id', postId)
+                .eq('user_id', currentUser.id);
+            
+            if (error) throw error;
+            
+            // Update local cache
+            if (postVoteCounts[postId]) {
+                if (currentVote === 1) postVoteCounts[postId].upvotes--;
+                else postVoteCounts[postId].downvotes--;
+                postVoteCounts[postId].net = postVoteCounts[postId].upvotes - postVoteCounts[postId].downvotes;
+            }
+            delete userVotes[postId];
+        }
+        
+        if (newVoteType !== 0) {
+            // Add new vote
+            const { error } = await sb
+                .from('post_votes')
+                .insert({
+                    post_id: postId,
+                    user_id: currentUser.id,
+                    vote_type: newVoteType
+                });
+            
+            if (error) throw error;
+            
+            // Update local cache
+            if (!postVoteCounts[postId]) {
+                postVoteCounts[postId] = { upvotes: 0, downvotes: 0, net: 0 };
+            }
+            if (newVoteType === 1) postVoteCounts[postId].upvotes++;
+            else postVoteCounts[postId].downvotes++;
+            postVoteCounts[postId].net = postVoteCounts[postId].upvotes - postVoteCounts[postId].downvotes;
+            userVotes[postId] = newVoteType;
+        }
+        
+        // Update UI
+        updateVoteUI(postId);
+        
+    } catch (err) {
+        console.error('Vote error:', err);
+        showToast('Failed to vote', 'error');
+    }
+}
+
+function updateVoteUI(postId) {
+    const card = document.querySelector(`[data-post-id="${postId}"]`);
+    if (!card) return;
+    
+    const upvoteBtn = card.querySelector('.vote-btn.upvote');
+    const downvoteBtn = card.querySelector('.vote-btn.downvote');
+    const voteCount = card.querySelector('.vote-count');
+    
+    if (upvoteBtn) {
+        upvoteBtn.classList.toggle('active', userVotes[postId] === 1);
+    }
+    if (downvoteBtn) {
+        downvoteBtn.classList.toggle('active', userVotes[postId] === -1);
+    }
+    if (voteCount && postVoteCounts[postId]) {
+        const net = postVoteCounts[postId].net;
+        voteCount.textContent = net > 0 ? `+${net}` : net;
+        voteCount.className = 'vote-count ' + (net > 0 ? 'positive' : net < 0 ? 'negative' : 'zero');
+    }
+}
+
+// ============================================================
+// UPDATED FEED TOOLBAR WITH SORTING
+// ============================================================
+
+function updateFeedToolbar() {
+    const toolbar = document.querySelector('.feed-toolbar');
+    if (!toolbar) return;
+    
+    toolbar.innerHTML = `
+        <h2 class="feed-title">Community Feed</h2>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div class="sort-container">
+                <span class="sort-label">Sort by:</span>
+                <select class="sort-dropdown" id="postSortDropdown">
+                    <option value="hot" ${postSortOrder === 'hot' ? 'selected' : ''}>🔥 Hot</option>
+                    <option value="newest" ${postSortOrder === 'newest' ? 'selected' : ''}>🕐 Newest</option>
+                    <option value="top" ${postSortOrder === 'top' ? 'selected' : ''}>📊 Top</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="newPostBtn">+ New Post</button>
+        </div>
+    `;
+    
+    // Re-attach event listener
+    document.getElementById('newPostBtn')?.addEventListener('click', () => {
+        postTitleInput.value = "";
+        postCategoryInput.value = "Discussion";
+        postContentInput.value = "";
+        postImageFiles = [];
+        postImagePreviews.innerHTML = "";
+        postImageUploadStatus.textContent = "";
+        postEditor.dataset.editPostId = '';
+        savePostBtn.textContent = 'Post';
+        savePostBtn.onclick = createNewPost;
+        document.querySelector('#postEditor h2').textContent = 'New Post';
+        showCommunitySection(postEditor);
+        postTitleInput.focus();
+    });
+    
+    document.getElementById('postSortDropdown')?.addEventListener('change', (e) => {
+        postSortOrder = e.target.value;
+        sortAndRenderPosts();
+    });
+}
+
+// ============================================================
+// SORT POSTS
+// ============================================================
+
+function sortAndRenderPosts() {
+    const postsList = document.getElementById('postsList');
+    if (!postsList) return;
+    
+    let sorted = [...posts];
+    
+    switch (postSortOrder) {
+        case 'hot':
+            // Hot: Combine recency and votes
+            sorted.sort((a, b) => {
+                const scoreA = calculateHotScore(a);
+                const scoreB = calculateHotScore(b);
+                return scoreB - scoreA;
+            });
+            break;
+        case 'newest':
+            sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            break;
+        case 'top':
+            sorted.sort((a, b) => {
+                const votesA = postVoteCounts[a.id]?.net || 0;
+                const votesB = postVoteCounts[b.id]?.net || 0;
+                return votesB - votesA;
+            });
+            break;
+    }
+    
+    // Pinned posts always first
+    const pinned = sorted.filter(p => p.pinned);
+    const unpinned = sorted.filter(p => !p.pinned);
+    sorted = [...pinned, ...unpinned];
+    
+    postsList.innerHTML = '';
+    sorted.forEach(post => buildPostCard(post, postsList));
+}
+
+function calculateHotScore(post) {
+    const now = Date.now();
+    const postTime = new Date(post.created_at).getTime();
+    const ageHours = (now - postTime) / (1000 * 60 * 60);
+    const votes = postVoteCounts[post.id]?.net || 0;
+    
+    // Reddit-style hot formula (simplified)
+    const sign = votes > 0 ? 1 : votes < 0 ? -1 : 0;
+    const magnitude = Math.abs(votes);
+    const order = Math.log10(Math.max(magnitude, 1));
+    const seconds = ageHours * 3600;
+    
+    return sign * order + seconds / 45000;
+}
+
+// ============================================================
+// UPDATED RENDER FEED
+// ============================================================
+
+async function renderFeed() {
+    postsList.innerHTML = "";
+    
+    // Show loading skeletons
+    for (let i = 0; i < 3; i++) {
+        const skeleton = document.createElement('div');
+        skeleton.className = 'skeleton-card';
+        skeleton.innerHTML = `
+            <div class="skeleton-votes"></div>
+            <div class="skeleton-content">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line title"></div>
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+            </div>
+        `;
+        postsList.appendChild(skeleton);
+    }
+    
+    updateFeedToolbar();
+
+    const { data, error } = await sb
+        .from("community_posts")
+        .select(`*, profiles!fk_community_posts_user_id(display_name, username, role, extra_tags, avatar_url)`)
+        .order("pinned", { ascending: false })
+        .order("created_at", { ascending: false });
+
+    if (error) {
+        console.error(error);
+        postsList.innerHTML = "";
+        const errDiv = document.createElement("div");
+        errDiv.className = "empty-state";
+        errDiv.textContent = "Could not load community posts.";
+        postsList.appendChild(errDiv);
+        return;
+    }
+
+    posts = data || [];
+
+    if (posts.length === 0) {
+        postsList.innerHTML = "";
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No posts yet. Be the first!";
+        postsList.appendChild(empty);
+        return;
+    }
+
+    // Fetch votes data
+    const postIds = posts.map(p => p.id);
+    await Promise.all([
+        fetchUserVotes(postIds),
+        fetchVoteCounts(postIds)
+    ]);
+
+    postsList.innerHTML = "";
+    sortAndRenderPosts();
+}
+
+// ============================================================
+// UPDATED BUILD POST CARD
+// ============================================================
+
+async function buildPostCard(post, container) {
+    const card = document.createElement("div");
+    card.className = "post-card" + (post.pinned ? " pinned" : "");
+    card.dataset.postId = post.id;
+    
+    const votes = postVoteCounts[post.id] || { upvotes: 0, downvotes: 0, net: 0 };
+    const userVote = userVotes[post.id] || 0;
+    const netVotes = votes.net;
+    
+    // Vote section (left side)
+    const votesSection = document.createElement("div");
+    votesSection.className = "post-card-votes";
+    
+    const voteContainer = document.createElement("div");
+    voteContainer.className = "vote-container";
+    
+    const upvoteBtn = document.createElement("button");
+    upvoteBtn.className = "vote-btn upvote" + (userVote === 1 ? " active" : "");
+    upvoteBtn.innerHTML = "↑";
+    upvoteBtn.title = "Upvote";
+    upvoteBtn.addEventListener("click", () => handleVote(post.id, 1));
+    
+    const voteCount = document.createElement("div");
+    voteCount.className = "vote-count " + (netVotes > 0 ? "positive" : netVotes < 0 ? "negative" : "zero");
+    voteCount.textContent = netVotes > 0 ? `+${netVotes}` : netVotes;
+    
+    const downvoteBtn = document.createElement("button");
+    downvoteBtn.className = "vote-btn downvote" + (userVote === -1 ? " active" : "");
+    downvoteBtn.innerHTML = "↓";
+    downvoteBtn.title = "Downvote";
+    downvoteBtn.addEventListener("click", () => handleVote(post.id, -1));
+    
+    voteContainer.append(upvoteBtn, voteCount, downvoteBtn);
+    votesSection.appendChild(voteContainer);
+    
+    // Content section (right side)
+    const contentWrapper = document.createElement("div");
+    contentWrapper.className = "post-card-content-wrapper";
+    
+    // Meta row (author, badges, category)
+    const metaRow = document.createElement("div");
+    metaRow.className = "post-card-meta";
+    
+    const authorInfo = document.createElement("div");
+    authorInfo.className = "post-card-author-info";
+    
+    const miniAvatar = document.createElement("div");
+    miniAvatar.className = "post-card-mini-avatar";
+    if (post.profiles?.avatar_url) {
+        miniAvatar.style.backgroundImage = `url(${post.profiles.avatar_url})`;
+        miniAvatar.textContent = '';
+    } else {
+        miniAvatar.textContent = getInitial(post.profiles?.display_name || post.profiles?.username);
+    }
+    
+    const authorLink = document.createElement("a");
+    authorLink.className = "post-card-author-name";
+    authorLink.href = "#";
+    authorLink.textContent = post.profiles?.display_name || "Unknown";
+    authorLink.addEventListener("click", (e) => { e.preventDefault(); openProfile(post.user_id); });
+    
+    authorInfo.append(miniAvatar, authorLink);
+    
+    if (post.profiles) {
+        const badgeWrap = document.createElement("span");
+        badgeWrap.className = "member-badges";
+        renderBadges(badgeWrap, post.profiles);
+        metaRow.appendChild(authorInfo);
+        metaRow.appendChild(badgeWrap);
+    } else {
+        metaRow.appendChild(authorInfo);
+    }
+    
+    const catSpan = document.createElement("span");
+    catSpan.className = "post-card-category";
+    catSpan.textContent = post.category;
+    metaRow.appendChild(catSpan);
+    
+    // Title
+    const h3 = document.createElement("h3");
+    h3.textContent = post.title;
+    
+    // Content text
+    const contentP = document.createElement("p");
+    contentP.className = "post-card-text";
+    contentP.textContent = post.content;
+    
+    // Images
+    const imagesDiv = document.createElement("div");
+    imagesDiv.className = "post-card-images";
+    if (post.images && post.images.length) {
+        post.images.forEach(url => {
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = "Post image";
+            img.loading = "lazy";
+            imagesDiv.appendChild(img);
+        });
+    }
+    
+    // Footer with timestamp and actions
+    const footer = document.createElement("div");
+    footer.className = "post-card-footer";
+    
+    const timestamp = document.createElement("span");
+    timestamp.className = "post-card-timestamp";
+    timestamp.textContent = formatDate(new Date(post.created_at).getTime());
+    
+    const actions = document.createElement("div");
+    actions.className = "post-card-actions";
+    
+    if (post.pinned) {
+        const pinBadge = document.createElement("span");
+        pinBadge.className = "pin-badge";
+        pinBadge.textContent = "📌 Pinned";
+        actions.appendChild(pinBadge);
+    }
+    
+    // Edit button
+    if (canEditPost(post)) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "btn btn-sm";
+        editBtn.textContent = "✎ Edit";
+        editBtn.addEventListener("click", () => openPostEditorForEdit(post));
+        actions.appendChild(editBtn);
+    }
+    
+    // Pin (Admin/Owner)
+    if (isAdminOrOwner(currentProfile)) {
+        const pinBtn = document.createElement("button");
+        pinBtn.className = "btn btn-sm btn-pin";
+        pinBtn.textContent = post.pinned ? "Unpin" : "📌 Pin";
+        pinBtn.addEventListener("click", async () => {
+            pinBtn.disabled = true;
+            await togglePin(post.id, !post.pinned);
+        });
+        actions.appendChild(pinBtn);
+    }
+    
+    // Delete
+    if (post.user_id === currentUser.id || isAdminOrOwner(currentProfile)) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-danger btn-sm";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", () => {
+            showDeleteDialog(
+                "Delete Post",
+                `Are you sure you want to delete "${post.title}"? This action cannot be undone.`,
+                async () => await deletePost(post.id)
+            );
+        });
+        actions.appendChild(delBtn);
+    }
+    
+    footer.append(timestamp, actions);
+    
+    // Assemble card
+    contentWrapper.append(metaRow, h3, contentP, imagesDiv, footer);
+    card.append(votesSection, contentWrapper);
+    
+    // Comments section
+    const commentsSection = document.createElement("div");
+    commentsSection.className = "comments-section";
+    commentsSection.style.margin = "0 24px 20px 24px";
+    
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "comments-toggle-btn";
+    toggleBtn.textContent = "💬 Show comments";
+    let commentsLoaded = false;
+    let commentsOpen = false;
+
+    const commentsList = document.createElement("div");
+    commentsList.className = "comments-list hidden";
+
+    const composer = document.createElement("div");
+    composer.className = "comment-composer";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "comment-textarea";
+    textarea.placeholder = "Write a comment...";
+    textarea.rows = 2;
+
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "btn btn-primary btn-sm";
+    submitBtn.textContent = "Post comment";
+
+    submitBtn.addEventListener("click", async () => {
+        const text = textarea.value.trim();
+        if (!text) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Posting...";
+
+        const { error } = await sb.from("post_comments").insert({
+            post_id: post.id,
+            user_id: currentUser.id,
+            content: text
+        });
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Post comment";
+
+        if (error) {
+            showToast("Could not post comment: " + error.message, "error");
+            return;
+        }
+
+        textarea.value = "";
+        await loadComments(post.id, commentsList);
+        showToast("Comment posted!", "success");
+    });
+
+    composer.append(textarea, submitBtn);
+
+    toggleBtn.addEventListener("click", async () => {
+        commentsOpen = !commentsOpen;
+        if (commentsOpen) {
+            commentsList.classList.remove("hidden");
+            composer.classList.remove("hidden");
+            if (!commentsLoaded) {
+                await loadComments(post.id, commentsList);
+                commentsLoaded = true;
+            }
+            toggleBtn.textContent = "💬 Hide comments";
+        } else {
+            commentsList.classList.add("hidden");
+            composer.classList.add("hidden");
+            toggleBtn.textContent = "💬 Show comments";
+        }
+    });
+
+    composer.classList.add("hidden");
+    commentsSection.append(toggleBtn, commentsList, composer);
+    contentWrapper.appendChild(commentsSection);
+    
+    container.appendChild(card);
+}
+
+// ============================================================
+// FIXED DELETE POST FUNCTION
+// ============================================================
+
+async function deletePost(postId) {
+    // Use a direct database call to ensure deletion works
+    const { error } = await sb
+        .from("community_posts")
+        .delete()
+        .eq("id", postId);
+    
+    if (error) {
+        console.error("Delete post error:", error);
+        throw new Error(error.message);
+    }
+    
+    // Remove from local cache
+    posts = posts.filter(p => p.id !== postId);
+    delete postVoteCounts[postId];
+    delete userVotes[postId];
+    
+    // Check if we're still in the community feed
+    const feedVisible = !communityFeed.classList.contains("hidden");
+    if (feedVisible) {
+        // Re-render the feed
+        sortAndRenderPosts();
+    } else {
+        // If we're elsewhere, just update the local state
+        // The next time the user visits the feed, it will be updated
+    }
+}
+
+// ============================================================
+// UPDATED TOGGLE PIN
+// ============================================================
+
+async function togglePin(postId, pinned) {
+    const { error } = await sb
+        .from("community_posts")
+        .update({ pinned })
+        .eq("id", postId);
+    
+    if (error) {
+        showToast("Could not update pin: " + error.message, "error");
+        return;
+    }
+    
+    // Update local state
+    const post = posts.find(p => p.id === postId);
+    if (post) post.pinned = pinned;
+    
+    // Re-sort and render
+    sortAndRenderPosts();
+    showToast(pinned ? "Post pinned!" : "Post unpinned", "success");
+}
+
+// ============================================================
+// UPDATED COMMENT DELETE WITH DIALOG
+// ============================================================
+
+// In the loadComments function, update the delete button handler:
+
+// Replace the delete button event listener in loadComments with:
+delBtn.addEventListener("click", () => {
+    showDeleteDialog(
+        "Delete Comment",
+        "Are you sure you want to delete this comment?",
+        async () => {
+            const { error } = await sb.from("post_comments").delete().eq("id", comment.id);
+            if (error) throw new Error(error.message);
+            await loadComments(postId, listEl);
+        }
+    );
+});
