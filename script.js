@@ -562,29 +562,28 @@ deleteBtn.addEventListener("click", function () {
     var page = pages.find(function (p) { return p.id === currentPageId; });
     if (!page) return;
     
-    // Capture the ID in a local variable so it doesn't get reset before the async callback finishes
-    var pageIdToDelete = currentPageId;
+    // Lock the ID into a local variable so it can't change while the dialog is open
+    var idToDelete = currentPageId;
     
     showDeleteDialog("Delete Page", 'Are you sure you want to delete "' + page.title + '"? This cannot be undone.', async function () {
-        // CRITICAL: { count: "exact" } tells us how many rows actually got deleted
-        var res = await sb.from("pages").delete({ count: "exact" }).eq("id", pageIdToDelete);
+        // { count: "exact" } forces Supabase to tell us EXACTLY how many rows were deleted
+        var res = await sb.from("pages").delete({ count: "exact" }).eq("id", idToDelete);
         
         if (res.error) {
             throw new Error(res.error.message);
         }
         
-        // If 0 rows deleted, RLS silently blocked it — treat as error
+        // If 0 rows were actually deleted, something blocked it — treat as error
         if (res.count === 0) {
-            throw new Error("Could not delete page. You might not have permission.");
+            throw new Error("Could not delete page. Try refreshing and trying again.");
         }
         
-        // Only remove from UI after database confirms the delete
-        pages = pages.filter(function (p) { return p.id !== pageIdToDelete; });
+        // Only remove from screen AFTER we know the database actually deleted it
+        pages = pages.filter(function (p) { return p.id !== idToDelete; });
         currentPageId = null;
         renderHome();
     });
 });
-
 closeBtn.addEventListener("click", function () { currentPageId = null; renderHome(); });
 
 newPageBtn.addEventListener("click", function () {
