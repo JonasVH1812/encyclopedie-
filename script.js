@@ -1266,7 +1266,7 @@ saveProfileBtn && saveProfileBtn.addEventListener("click", async function () {
 });
 
 // ============================================================
-// ADMIN PANEL
+// ADMIN PANEL (WITH TAG REORDERING)
 // ============================================================
 
 async function renderAdminPanel() {
@@ -1303,7 +1303,11 @@ async function renderAdminPanel() {
             tagBtn.addEventListener("click", async function () {
                 var tag = tagInput.value.trim(); if (!tag) return;
                 var tags = Array.isArray(m.extra_tags) ? m.extra_tags.slice() : [];
-                if (tags.indexOf(tag) === -1) { tags.push(tag); var r = await sb.from("profiles").update({ extra_tags: tags }).eq("id", m.id); if (!r.error) { tagInput.value = ""; renderAdminPanel(); showToast("Tag added!", "success"); } }
+                if (tags.indexOf(tag) === -1) {
+                    tags.push(tag);
+                    var r = await sb.from("profiles").update({ extra_tags: tags }).eq("id", m.id);
+                    if (!r.error) { tagInput.value = ""; renderAdminPanel(); showToast("Tag added!", "success"); }
+                }
             });
             var saveRoleBtn = document.createElement("button"); saveRoleBtn.className = "btn btn-primary btn-sm"; saveRoleBtn.textContent = "Save Role";
             saveRoleBtn.addEventListener("click", async function () {
@@ -1318,16 +1322,73 @@ async function renderAdminPanel() {
         card.appendChild(header);
 
         if (Array.isArray(m.extra_tags) && m.extra_tags.length) {
-            var tagList = document.createElement("div"); tagList.className = "member-badges";
-            m.extra_tags.forEach(function (tag) {
-                var b = document.createElement("span"); b.className = badgeClass(tag); b.textContent = tag; b.style.cursor = "pointer"; b.title = "Click to remove";
+            var tagList = document.createElement("div");
+            tagList.className = "admin-tag-list";
+            tagList.style.display = "flex";
+            tagList.style.flexDirection = "column";
+            tagList.style.gap = "6px";
+            tagList.style.marginTop = "4px";
+
+            m.extra_tags.forEach(function (tag, index) {
+                var row = document.createElement("div");
+                row.className = "admin-tag-row";
+                row.style.display = "flex";
+                row.style.alignItems = "center";
+                row.style.gap = "8px";
+
+                // Up arrow
+                var upBtn = document.createElement("button");
+                upBtn.className = "admin-tag-arrow";
+                upBtn.textContent = "▲";
+                upBtn.title = "Move up";
+                upBtn.disabled = index === 0;
+                upBtn.addEventListener("click", async function () {
+                    var tags = m.extra_tags.slice();
+                    var temp = tags[index - 1];
+                    tags[index - 1] = tags[index];
+                    tags[index] = temp;
+                    var r = await sb.from("profiles").update({ extra_tags: tags }).eq("id", m.id);
+                    if (!r.error) { renderAdminPanel(); }
+                    else showToast(r.error.message, "error");
+                });
+
+                // Down arrow
+                var downBtn = document.createElement("button");
+                downBtn.className = "admin-tag-arrow";
+                downBtn.textContent = "▼";
+                downBtn.title = "Move down";
+                downBtn.disabled = index === m.extra_tags.length - 1;
+                downBtn.addEventListener("click", async function () {
+                    var tags = m.extra_tags.slice();
+                    var temp = tags[index + 1];
+                    tags[index + 1] = tags[index];
+                    tags[index] = temp;
+                    var r = await sb.from("profiles").update({ extra_tags: tags }).eq("id", m.id);
+                    if (!r.error) { renderAdminPanel(); }
+                    else showToast(r.error.message, "error");
+                });
+
+                // Tag badge (click to remove)
+                var b = document.createElement("span");
+                b.className = badgeClass(tag);
+                b.textContent = tag;
+                b.style.cursor = "pointer";
+                b.title = "Click to remove";
                 b.addEventListener("click", async function () {
                     var tags = m.extra_tags.filter(function (t) { return t !== tag; });
                     var r = await sb.from("profiles").update({ extra_tags: tags }).eq("id", m.id);
                     if (!r.error) { renderAdminPanel(); showToast("Tag removed", "info"); }
                 });
-                tagList.appendChild(b);
+
+                // Position number
+                var pos = document.createElement("span");
+                pos.className = "admin-tag-pos";
+                pos.textContent = (index + 1) + ".";
+
+                row.append(upBtn, downBtn, pos, b);
+                tagList.appendChild(row);
             });
+
             card.appendChild(tagList);
         }
         adminMembersList.appendChild(card);
