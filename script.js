@@ -1,3 +1,7 @@
+// Add iOS‑specific class for native scrolling behavior
+if (window.Capacitor && window.Capacitor.getPlatform() === 'ios') {
+  document.body.classList.add('ios-app');
+}
 document.addEventListener("mousemove", (e) => {
     document.body.style.setProperty("--x", e.clientX + "px");
     document.body.style.setProperty("--y", e.clientY + "px");
