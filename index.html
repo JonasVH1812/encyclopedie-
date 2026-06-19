@@ -203,8 +203,18 @@
 
 <script>
     // iOS detection for snap‑scroll sub‑nav
+    // Use a small delay to ensure Capacitor is ready
     if (window.Capacitor && window.Capacitor.getPlatform() === 'ios') {
         document.body.classList.add('ios-app');
+    } else {
+        // Fallback: check user agent if Capacitor not present yet
+        setTimeout(() => {
+            if (window.Capacitor && window.Capacitor.getPlatform() === 'ios') {
+                document.body.classList.add('ios-app');
+            } else if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+                document.body.classList.add('ios-app');
+            }
+        }, 100);
     }
 </script>
 </body>
